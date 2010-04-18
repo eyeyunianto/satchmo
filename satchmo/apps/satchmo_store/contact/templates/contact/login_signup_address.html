@@ -1,0 +1,104 @@
+{% extends "shop/base.html" %}
+{% load i18n %}
+
+{% block pagetitle %}Login{% endblock %}
+{% block bodyclass %}login{% endblock %}
+{% block bodyid %}login{% endblock %}
+
+{% block extra-head %}
+{% include "contact/_ContactInfoForm.html" %}
+{% endblock %}
+
+{% block content %}
+<h4>{% trans "Login, or sign up to the store" %}</h4>
+
+{% include "contact/_login_form.html" %}
+
+<form name="createform" method="post" action=".">
+<input type="hidden" name="action" value="create" />
+<input type="hidden" name="next" value="{% if next %}{{ next }}{% else %}{% url satchmo_account_info %}{% endif %}" />
+<table class="form nohead">
+    <thead>
+        <tr>
+            <th colspan="2" class="label"><b>{% trans 'New Members, Create Your Account Below' %}</b></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if createform.has_errors %}
+            <tr><td class="warn" colspan="2">
+                {% blocktrans count createform.errors.items|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+            </td></tr>
+        {% endif %}
+        <tr><td class="label"><label for="id_email">Email Address:</label></td> <td class="text">{{ createform.email }}</td></tr>
+        {% if createform.email.errors %}<tr><td>&nbsp;</td><td class="warn">*** {{ createform.email.errors|join:", " }}</td></tr>{% endif %}
+
+        <tr><td class="label"><label for="id_first_name">First Name:</label></td><td class="text"> {{ createform.first_name }}</td></tr>
+        {% if createform.first_name.errors %}<tr><td>&nbsp;</td><td class="warn">*** {{ createform.first_name.errors|join:", " }}</td></tr>{% endif %}
+
+        <tr><td class="label"><label for="id_contents">Last Name:</label></td><td class="text"> {{ createform.last_name }}</td></tr>
+        {% if createform.last_name.errors %}<tr><td>&nbsp;</td><td class="warn">*** {{ createform.last_name.errors|join:", " }}</td></tr>{% endif %}
+
+        <tr><td class="label"><label for="id_password">Password:</label></td><td class="text"> {{ createform.password1 }}</td></tr>
+        {% if createform.password1.errors %}<tr><td>&nbsp;</td><td class="warn">*** {{ createform.password1.errors|join:", " }}</td></tr>{% endif %}
+
+        <tr><td class="label"><label for="id_password2">Password (again):</label></td><td class="text"> {{ createform.password2 }}</td></tr>
+        {% if createform.password2.errors %}<tr><td>&nbsp;</td><td class="warn">*** {{ createform.password2.errors|join:", " }}</td></tr>{% endif %}
+
+	    <tr><td><label for="id_phone">{% trans "Phone number" %}*</label></td><td> {{ createform.phone }}</td></tr>
+	    {% if createform.phone.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.phone.errors|join:", " }}</td></tr>{% endif %}
+
+	    {% if show_newsletter %}
+	    <tr><td colspan="2">{{ createform.newsletter }} <label for="id_newsletter">{% trans 'Sign me up for Email Updates about new products and special offers!' %}</label>
+	        </td>
+		</tr>
+	    {% if createform.newsletter.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.newsletter.errors|join:", " }}</td></tr>{% endif %}
+	    {% else %}
+	    <input type='hidden' name='newsletter' value="False" />
+	    {% endif %}
+
+	    {% block billing-info %}{% with createform as form %}{% include "contact/_ContactInfoForm_billing.html" %}{% endwith %}{% endblock %}
+
+	    <tr><td colspan="2"><h4>{% trans "Shipping Address" %}</h4></td></tr>
+
+	    <tr><td><label for="id_copy_address">{% trans "Shipping same as billing?" %}</label></td><td> {{ createform.copy_address }}</td></tr>
+	    {% if createform.copy_address.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.copy_address.errors|join:", " }}</td></tr>{% endif %}
+
+	    <tr class="shiprow"><td><label for="id_ship_addressee">{% trans "Ship To" %}</label><p class="help">{% trans "If different from the first and last names above" %}</td><td> {{ createform.ship_addressee }}</td></tr>
+	    {% if createform.ship_addressee.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.ship_addressee.errors|join:", "}}</td></tr>{% endif %}
+
+	    <tr class="shiprow"><td><label for="id_ship_street1">{% trans "Street" %}</label></td><td> {{ createform.ship_street1 }}</td></tr>
+	    {% if createform.ship_street1.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.ship_street1.errors|join:", " }}</td></tr>{% endif %}
+
+	    <tr class="shiprow"><td><label for="id_ship_street2">{% trans "Street" %}</label></td><td> {{ createform.ship_street2 }}</td></tr>
+	    {% if createform.ship_street2.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.ship_street2.errors|join:", " }}</td></tr>{% endif %}
+
+	    <tr class="shiprow"><td><label for="id_ship_city">{% trans "City" %}</label></td><td> {{ createform.ship_city }}</td></tr>
+	    {% if createform.ship_city.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.ship_city.errors|join:", " }}</td></tr>{% endif %}
+
+	    {% if country %}
+	      {% if createform.fields.ship_state.choices %}
+	       <tr class="shiprow"><td><label for="id_ship_state">{% if country.get_admin_area_display %}{{ country.get_admin_area_display }}{% else %}{% trans "State/Province" %}{% endif %}</label></td><td> {{ createform.ship_state }}</td></tr>
+	      {% endif %}
+	    {% else %}
+	      <tr class="shiprow"><td><label for="id_ship_state">{% trans "State/Province" %}</label></td><td> {{ createform.ship_state }}</td></tr>
+	    {% endif %}
+	    {% if createform.ship_state.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.ship_state.errors|join:", " }}</td></tr>{% endif %}
+
+	    <tr class="shiprow"><td><label for="id_ship_postal_code">{% trans "Zipcode/Postcode" %}</label></td><td>{{ createform.ship_postal_code }}</td></tr>
+	    {% if createform.ship_postal_code.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.ship_postal_code.errors|join:", " }}</td></tr>{% endif %}
+
+	    {% if not country %}
+	    <tr class="shiprow"><td><label for="id_ship_country">{% trans "Country" %}</label></td><td> {{ createform.ship_country }}</td></tr>
+	    {% if createform.ship_country.errors %}<tr><td>&nbsp;</td><td>*** {{ createform.ship_country.errors|join:", " }}</td></tr>{% endif %}
+	    {% endif %}
+
+        <tr>
+            <td colspan="2" class="button">
+                <input type="submit" name="create" value="{% trans 'Create' %}" />
+            </td>
+        </tr>
+     </tbody>
+</table>
+</form>
+
+{% endblock %}
