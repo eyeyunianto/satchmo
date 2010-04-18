@@ -1,10 +1,9 @@
 from django import forms
-from django.contrib.auth.models import User
 from django.db.models import Q
 from django.forms.extras.widgets import SelectDateWidget
 from django.utils.translation import ugettext_lazy as _, ugettext
 from l10n.models import Country
-from livesettings import config_value, config_get_group, SettingNotSet
+from livesettings import config_value
 from satchmo_store.contact.models import Contact, AddressBook, PhoneNumber, Organization, ContactRole
 from satchmo_store.shop.models import Config
 from satchmo_store.shop.utils import clean_field
@@ -18,15 +17,15 @@ log = logging.getLogger('satchmo_store.contact.forms')
 selection = ''
 
 def area_choices_for_country(country, translator=_):
-    if not country:
-        return None
-    areas = country.adminarea_set.filter(active=True)
-    if areas and areas.count()>0:
-        areas = [(area.abbrev or area.name, area.name) for area in areas]
-        areas.insert(0,('',translator("---Please Select---")))
-        return areas
-    else:
-        return None
+    choices = [('',translator("Not Applicable"))]
+
+    if country:
+        areas = country.adminarea_set.filter(active=True)
+        if areas.count()>0:
+            choices = [('',translator("---Please Select---"))]
+            choices.extend([(area.abbrev or area.name, area.name) for area in areas])
+
+    return choices
 
 class ProxyContactForm(forms.Form):
     def __init__(self, *args, **kwargs):
@@ -69,6 +68,7 @@ class ContactInfoForm(ProxyContactForm):
         self._shippable = shippable
 
         self.required_billing_data = config_value('SHOP', 'REQUIRED_BILLING_DATA')
+        self.required_shipping_data = config_value('SHOP', 'REQUIRED_SHIPPING_DATA')
         self._local_only = shop.in_country_only
         self.enforce_state = config_value('SHOP','ENFORCE_STATE')
 
@@ -79,34 +79,58 @@ class ContactInfoForm(ProxyContactForm):
         self.fields['ship_country'] = forms.ModelChoiceField(shop.countries(), required=False, label=_('Country'), empty_label=None, initial=shipping_country.pk)
 
         if self.enforce_state:
-            if self.is_bound:
+            # if self.is_bound and not self._local_only:
+            if self.is_bound and not self._local_only:
                 # If the user has already chosen the country and submitted,
                 # populate accordingly.
                 #
                 # We don't really care if country fields are empty;
                 # area_choices_for_country() handles those cases properly.
-                billing_country = clean_field(self, 'country')
-                shipping_country = clean_field(self, 'ship_country')
+                billing_country_data = clean_field(self, 'country')
+                shipping_country_data = clean_field(self, 'ship_country')
 
-                if clean_field(self, "copy_address") and not shipping_country:
+                # Has the user selected a country? If so, use it.
+                if billing_country_data:
+                    billing_country = billing_country_data
+
+                if clean_field(self, "copy_address"):
                     shipping_country = billing_country
+                elif shipping_country_data:
+                    shipping_country = shipping_country_data
 
             # Get areas for the initial country selected.
             billing_areas = area_choices_for_country(billing_country)
             shipping_areas = area_choices_for_country(shipping_country)
 
-            if billing_areas is not None:
-                billing_state = (self._contact and getattr(self._contact.billing_address, 'state', None)) or selection
-                self.fields['state'] = forms.ChoiceField(choices=billing_areas, initial=billing_state, label=_('State'))
+            billing_state = (self._contact and getattr(self._contact.billing_address, 'state', None)) or selection
+            self.fields['state'] = forms.ChoiceField(choices=billing_areas, initial=billing_state, label=_('State'),
+                # if there are not states, then don't make it required. (first
+                # choice is always either "--Please Select--", or "Not
+                # Applicable")
+                required=len(billing_areas)>1)
 
-            if shipping_areas is not None:
-                shipping_state = (self._contact and getattr(self._contact.shipping_address, 'state', None)) or selection
-                self.fields['ship_state'] = forms.ChoiceField(choices=shipping_areas, initial=shipping_state, required=False, label=_('State'))
+            shipping_state = (self._contact and getattr(self._contact.shipping_address, 'state', None)) or selection
+            self.fields['ship_state'] = forms.ChoiceField(choices=shipping_areas, initial=shipping_state, required=False, label=_('State'))
 
         for fname in self.required_billing_data:
             if fname == 'country' and self._local_only:
                 continue
+
+            # ignore the user if ENFORCE_STATE is on; if there aren't any
+            # states, we might have made the billing state field not required in
+            # the enforce_state block earlier, and we don't want the user to
+            # make it required again.
+            if fname == 'state' and self.enforce_state:
+                continue
+
             self.fields[fname].required = True
+
+        # if copy_address is on, turn of django's validation for required fields
+        if not (self.is_bound and clean_field(self, "copy_address")):
+            for fname in self.required_shipping_data:
+                if fname == 'country' and self._local_only:
+                    continue
+                self.fields['ship_%s' % fname].required = True
 
         # slap a star on the required fields
         for f in self.fields:
@@ -224,7 +248,8 @@ class ContactInfoForm(ProxyContactForm):
             return self.cleaned_data['ship_' + field_name]
         else:
             val = clean_field(self, 'ship_' + field_name)
-            if (not val) and field_name in ('street1', 'city', 'state', 'postal_code'):
+            # REQUIRED_SHIPPING_DATA doesn't contain 'ship_' prefix
+            if (not val) and field_name in self.required_shipping_data:
                 raise forms.ValidationError(_('This field is required.'))
             return val
 
