@@ -1,8 +1,10 @@
 """Protx Form"""
 from django import forms
 from django.utils.translation import ugettext as _
+from livesettings import config_value
 from payment.forms import CreditPayShipForm, MONTHS
 from payment.modules.protx.config import REQUIRES_ISSUE_NUMBER
+import datetime
 import logging
 
 log = logging.getLogger('payment.protx.forms')
@@ -10,7 +12,7 @@ log = logging.getLogger('payment.protx.forms')
 class ProtxPayShipForm(CreditPayShipForm):
     """Adds fields required by Prot/X to the Credit form."""
     
-    card_holder = forms.CharField(max_length=30, required=False)
+    card_holder = forms.CharField(max_length=75, required=False)
     month_start = forms.ChoiceField(choices=[(1, '--')]+MONTHS, required=False)
     year_start = forms.ChoiceField(required=False)
     issue_num = forms.CharField(max_length=2, required=False)
@@ -23,12 +25,15 @@ class ProtxPayShipForm(CreditPayShipForm):
             if user and user.is_authenticated() and user.contact_set.count() > 0:
                 cf.initial = self.tempContact.full_name
         self.requires_issue_number = REQUIRES_ISSUE_NUMBER
-        self.fields['year_start'].choices = self.fields['year_expires'].choices
+        num_years = config_value('PAYMENT', 'CC_NUM_YEARS')
+        year_now = datetime.date.today().year
+        self.fields['year_start'].choices = [(year, year) for year in range(year_now, year_now-num_years-1, -1)]
 
-    def save(self, request, cart, contact, payment_module):
+    def save(self, request, cart, contact, payment_module, data=None):
         """Save the order and the credit card details."""
         super(ProtxPayShipForm, self).save(request, cart, contact, payment_module)
-        data = self.cleaned_data 
+        if data is None:
+            data = self.cleaned_data 
         log.debug("data: %s", data)                       
         card_holder=data.get('card_holder', '')
         if not card_holder:
@@ -105,4 +110,3 @@ class ProtxPayShipForm(CreditPayShipForm):
     def _maybe_require(self, data, field, message):
         if data['credit_type'] in REQUIRES_ISSUE_NUMBER and not (data[field]):
             raise forms.ValidationError(message)
-        

@@ -72,6 +72,8 @@ MIDDLEWARE_CLASSES = (
 
 #this is used to add additional config variables to each request
 # NOTE: overridden in local_settings.py
+# NOTE: If you enable the recent_products context_processor, you MUST have the
+# 'satchmo_ext.recentlist' app installed.
 TEMPLATE_CONTEXT_PROCESSORS = ('satchmo_store.shop.context_processors.settings',
                                'django.core.context_processors.auth',
                                #'satchmo_ext.recentlist.context_processors.recent_products',
@@ -90,6 +92,8 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.sitemaps',
     'registration',
+    'sorl.thumbnail',
+    'south',
     'keyedcache',
     'livesettings',
     'l10n',
@@ -109,11 +113,13 @@ INSTALLED_APPS = (
     #'satchmo_ext.product_feeds',
     #'satchmo_ext.brand',
     'payment',
-    #'payment.modules.purchaseorder',
-    'payment.modules.giftcertificate',
+    'payment.modules.dummy',
+    'payment.modules.paypal',
+    #'payment.modules.giftcertificate',
     #'satchmo_ext.wishlist',
     #'satchmo_ext.upsell',
     #'satchmo_ext.productratings',
+    'satchmo_ext.satchmo_toolbar',
     'satchmo_utils',
     #'shipping.modules.tieredquantity',
     #'django_extensions',
@@ -133,6 +139,9 @@ AUTHENTICATION_BACKENDS = (
 #    'INTERCEPT_REDIRECTS' : False,
 #}
 
+L10N_SETTINGS = {
+}
+
 #### Satchmo unique variables ####
 #from django.conf.urls.defaults import patterns, include
 SATCHMO_SETTINGS = {
@@ -140,6 +149,8 @@ SATCHMO_SETTINGS = {
     'MULTISHOP' : False,
     #'SHOP_URLS' : patterns('satchmo_store.shop.views',)
 }
+
+SKIP_SOUTH_TESTS=True
 
 # Load the local settings
 from local_settings import *

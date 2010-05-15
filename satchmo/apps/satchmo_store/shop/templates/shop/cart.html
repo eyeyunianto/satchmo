@@ -5,6 +5,7 @@
 {% load satchmo_util %}
 {% load satchmo_product %}
 {% load satchmo_discounts %}
+{% load normalize_decimal %}
 
 {% block navbar %}
     <li class="first"><a href="{{shop_base}}/">{% trans "Home" %}</a></li>
@@ -16,7 +17,7 @@
 {% if error_message %}
 <div class="error">{{ error_message }}</div>
 {% endif %}
-{% if not cart %}
+{% if cart.is_empty %}
     <h4>{% trans "Your cart is empty." %}</h4>
 {% else %}
     <h4>{% trans "Your Cart" %}</h4>
@@ -42,7 +43,7 @@
             <td align="center">
                 <form class="qtyform" id="form-{{ cartitem.id }}" action="{% url satchmo_cart_set_qty %}" method="post">
                     <input type="hidden" name="cartitem" value="{{ cartitem.id }}" />
-					<input type="text" name="quantity" id="id_quantity" value="{{ cartitem.quantity }}" />
+					<input type="text" name="quantity" id="id_quantity" value="{{ cartitem.quantity|normalize_decimal }}" />
                     <input type="submit" id="id_update_submit" value="{% trans 'update amount' %}" />
                 </form>
             </td>

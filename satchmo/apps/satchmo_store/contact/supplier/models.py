@@ -17,7 +17,7 @@ class RawItem(models.Model):
     supplier_num = models.CharField(_("Supplier ID"), max_length=50)
     description = models.CharField(_("Description"), max_length=200)
     unit_cost = models.DecimalField(_("Unit Cost"), max_digits=6, decimal_places=2)
-    inventory = models.IntegerField(_("Inventory"))
+    inventory = models.DecimalField(_("Inventory"),  max_digits=18,  decimal_places=6)
     
     def __unicode__(self):
         return self.description
@@ -45,11 +45,11 @@ class SupplierOrder(models.Model):
         return(self.supplierorderstatus_set.latest('date').status)
     status = property(_status)  
     
-    def save(self, force_insert=False, force_update=False):
+    def save(self, **kwargs):
         """Ensure we have a date_created before saving the first time."""
         if not self.pk:
             self.date_created = datetime.date.today()
-        super(SupplierOrder, self).save(force_insert=force_insert, force_update=force_update)
+        super(SupplierOrder, self).save(**kwargs)
     
     class Meta:
         verbose_name = _("Supplier Order")

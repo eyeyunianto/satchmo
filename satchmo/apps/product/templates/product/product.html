@@ -7,7 +7,7 @@ ProductVariations or CustomProducts, look for product/detail_xxx.html
 -------------------------------------------------------------------
 {% endcomment %}
 {% load i18n %}
-{% load satchmo_thumbnail %}
+{% load thumbnail %}
 {% load satchmo_price %}
 {% load satchmo_currency satchmo_category %}
 {% load satchmo_util satchmo_discounts %}
@@ -27,16 +27,6 @@ ProductVariations or CustomProducts, look for product/detail_xxx.html
 <li>{{ product.translated_name }}</li>
 {% endblock %}
 
-{% block sidebar-categories %}
-    <div id="menu_container">
-    {% if product.get_category %}
-        {% category_tree product.get_category.id %}
-    {% else %}
-        {% category_tree %}
-    {% endif %}
-    </div>
-{% endblock %}
-
 {% block content %}
 {% block productdetail %}
 <h4>{{ product.translated_name }}</h4>
@@ -47,12 +37,21 @@ ProductVariations or CustomProducts, look for product/detail_xxx.html
 	<span id="price">{{ product|discount_price:sale|currency }}</span>
 </h3>
 {% for pic in product.productimage_set.all %}
-    <img src="{{ pic.picture.url|thumbnail:"width=280" }}" width="280" />
+    {% thumbnail pic.picture 280x280 as image %}
+    <img src="{{ image }}" width="{{ image.width }}" height="{{ image.height }}" />
 {% endfor %}
+
+{% with product.translated_attributes as atts %}{% if atts %}
+<p class="productattributes">
+{% for att in product.translated_attributes %}
+{{ att.description }}: {{ att.value }}<br/>
+{% endfor %}
+</p>
+{% endif %}{% endwith %}
 
 {% if error_message %}<p><strong>{{ error_message }}</strong></p>{% endif %}
 <form id="options" action="{% url satchmo_smart_add %}" method="post">
-{% trans "Quantity" %} <input type="text", size="2", name="quantity" id="quantity" value="1" class="priced" />
+{% trans "Quantity" %} <input type="text" size="5" name="quantity" id="quantity" value="1" class="priced" />
 <input type="hidden" name="productname" id="productname" value="{{product.slug}}" />
 <input type="submit" name="addcart" value="{% trans "Add to cart" %}" />
 {% plugin_point "product_add_buttons" %}

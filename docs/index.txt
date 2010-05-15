@@ -10,8 +10,10 @@ Overview
    :maxdepth: 1
 
    introduction
+   about
    features
    requirements
+   directory_structure
 
 Installation
 ============
@@ -19,6 +21,7 @@ Installation
 .. toctree::
    :maxdepth: 1
 
+   quickstart
    new_installation
    configuration
 
@@ -31,6 +34,7 @@ Store Usage
    product
    discounts
    pricing
+   tax
    shipping
    analytics
    payment
@@ -44,10 +48,14 @@ Modifying A Store
    :maxdepth: 1
 
    customization
+   custom-admin
    custom-payment
+   product-attributes
    custom-product
    translation
    templates
+   template-filters-tags
+   views
    signals
 
 Optional Modules
@@ -59,11 +67,29 @@ Optional Modules
    google-base
    upsell
 
+Tutorials
+=========
+.. toctree::
+   :maxdepth: 1
+
+   tutorial1
+
+Deploying A Store
+=================
+
+.. toctree::
+   :maxdepth: 1
+
+   deploying
+   managing
+
 Additional Notes
 ================
 .. toctree::
    :maxdepth: 1
 
+   release-notes-0-9-1
+   release-notes-0-9
    release-notes-0-8-1
    release-notes-0-8
    release-notes-0-7

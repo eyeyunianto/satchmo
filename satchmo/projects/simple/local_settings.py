@@ -10,7 +10,7 @@ TEMPLATE_DEBUG = DEBUG
 if LOCAL_DEV:
     INTERNAL_IPS = ('127.0.0.1',)
 
-DIRNAME = os.path.dirname(__file__)
+DIRNAME = os.path.dirname(os.path.abspath(__file__))
 
 # trick to get the two-levels up directory, which for the "simple" project should be the satchmo dir
 # for most "normal" projects, you should directly set the SATCHMO_DIRNAME, and skip the trick
@@ -58,11 +58,13 @@ SITE_NAME = "Simple Satchmo"
 # not suitable for deployment, for testing only, for deployment strongly consider memcached.
 CACHE_BACKEND = "locmem:///"
 CACHE_TIMEOUT = 60*5
-CACHE_PREFIX = "S"
+CACHE_PREFIX = "Z"
+
+ACCOUNT_ACTIVATION_DAYS = 7
 
 #Configure logging
 LOGFILE = "satchmo.log"
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%a, %d %b %Y %H:%M:%S')
 
@@ -71,4 +73,5 @@ logging.basicConfig(level=logging.INFO,
 # add the handler to the root logger
 #logging.getLogger('').addHandler(fileLog)
 logging.getLogger('keyedcache').setLevel(logging.INFO)
+logging.getLogger('l10n').setLevel(logging.INFO)
 logging.info("Satchmo Started")

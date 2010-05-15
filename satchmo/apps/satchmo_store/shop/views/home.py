@@ -4,6 +4,7 @@ from django.template import RequestContext
 from django.utils.translation import ugettext as _
 from livesettings import config_value
 from product.views import display_featured
+from satchmo_utils.views import bad_or_missing
 
 def home(request, template="shop/index.html"):
     # Display the category, its child categories, and its products.
@@ -37,5 +38,5 @@ def home(request, template="shop/index.html"):
         'paginator' : paginator
     })
     
-    return render_to_response(template, ctx)
+    return render_to_response(template, context_instance=ctx)
     

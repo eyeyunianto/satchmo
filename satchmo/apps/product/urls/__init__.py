@@ -1,15 +1,15 @@
 from category import urlpatterns as catpatterns
 from django.conf.urls.defaults import *
-from livesettings import config_value
-from product import urlpatterns as prodpatterns
+from products import urlpatterns as prodpatterns
 import product
-from satchmo_utils.signals import collect_urls
+from signals_ahoy.signals import collect_urls
+from satchmo_store.shop import get_satchmo_setting
 
-catbase = r'^' + config_value('PRODUCT','CATEGORY_SLUG') + '/'
-prodbase = r'^' + config_value('PRODUCT','PRODUCT_SLUG') + '/'
+catbase = r'^' + get_satchmo_setting('CATEGORY_SLUG') + '/'
+prodbase = r'^' + get_satchmo_setting('PRODUCT_SLUG') + '/'
 
 urlpatterns = patterns('',
-    (prodbase, include('product.urls.product')),
+    (prodbase, include('product.urls.products')),
     (catbase, include('product.urls.category')),
 )
 

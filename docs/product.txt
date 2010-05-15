@@ -50,7 +50,13 @@ Meta
     
 Description
     This is a free form field that describes this category.  You can use this to help guide users in your site.  It's also helpful for search engines.
+
+Ordering
+    This field can be used to specify which order the categories should be displayed.
     
+Active
+    This allows a category to be populated with information but to be set inactive.
+
 .. index::
    single: Product; fields
    
@@ -78,12 +84,12 @@ Date_added
     The date you added this product to your store.  It could be useful for showing a list of new products.
     
 Active
-    A flag to identify which items are still valid in the store.  If you decide you don't want to show an item for purchase, I recommend making it Active=False instead of trying to delete it.
+    A flag to identify which items are still valid in the store.  If you decide you don't want to show an item for purchase, we recommend making it Active=False instead of trying to delete it.
     
 Featured
     Another flag which can be used to identify special items that you may want to highlight in your site. In the default templates, featured items show-up on the front page of the store.
     
-items in stock
+Items in stock
     The inventory of this specific item.
 
 Meta
@@ -93,13 +99,15 @@ Weight, Length and Height
     These dimensions are for your use in displaying the item's info. It can also be used for shipping calculations.
 
 Taxable
-    A flag to tell whether or not tax should be calculated for this product.  More information on taxes can be found ...
+    A flag to tell whether or not tax should be calculated for this product.
     
 Tax_class
     Allows you to set the rate at which tax is calculated.
 
 Related_items
-    Certain products may naturally be grouped together.  If you were to purchase a movie, you might want to include links to the book based on the movie or maybe a movie poster.  This would be the place to record those linkages.
+    Certain products may naturally be grouped together.  If you were to purchase a movie, you might want to include links to the book 
+    based on the movie or maybe a movie poster.  This would be the place to record those linkages. By default, this does not show up in the
+    store. You will need to modify your templates to display it.
     
 Also_purchased
     Another field to show relationships between products.  This can be useful if you want to try to increase sales by showing what others have purchased when they bought this product.
@@ -117,16 +125,22 @@ Product Subtypes
    single: Product; attributes
 
 Product Attributes
-++++++++++++++++++
+^^^^^^^^^^^^^^^^^^
 
 In some cases, you may want to have certain product information stored in the database.  For instance, you might want to have "number of pages" or "ISBN" fields
 for all of the books in your store.  Attributes allow you to associate arbitrary data with your products via name, value pairs.
+
+In the latest version of Satchmo, these are more powerful and useful because you can define specific
+attributes to capture as well as validation to perform on the data.
+
+Refer to :doc:`product-attributes` for more details on using this feature to customize the information
+you store and present for your products.
 
 .. index::
    single: Product; price
 
 Price
-+++++
+^^^^^
 
 The final choice you have with your products is if there is additional pricing you would like to apply for bulk or special discounts.  For instance, you may want to charge someone $10 for 1-5 shirts but only $7 if they order 6 or more.  This model allows you to do such configuration.
 
@@ -143,7 +157,7 @@ Expires
    single: Product; images
    
 Images
-++++++
+^^^^^^
 
 In addition to the information discussed above, you can add as many images as you would like to your item.  One of the nice things about the way Satchmo handles these images is that they are automatically converted to thumbnails and are cached so that the conversion process does not slow down your web site.
 
@@ -156,7 +170,7 @@ Caption
     A description of this image.  This field may be used to describe the different angles that images show.
     
 Sort
-    If you would like control of the order in which the images are displayed, this field can be used.  This field is also special in that it must be filled in!  If you want to delete an image from your item, you must delete the value in the sort field and save the image!
+    If you would like control of the order in which the images are displayed, this field can be used. 
 
 .. index::
    single: Product; options
@@ -164,10 +178,10 @@ Sort
 Product Options
 ----------------
 
-As discussed above, a product is the central focus of your store.  For many cases, the products in your store may have several options.  For instance, if you sell t-shirts, a visitor to your store should be able to choose the size of the shirt while looking at the main item.  You may also want them to choose a color, style and/or a bunch of other different options.  The challenge with this much flexibility is building something that is easy for the user to understnad and easy for the store administrator to maintain.  Satchmo uses option groups and options to create configurable products and product variants.
+As discussed above, a product is the central focus of your store.  For many cases, the products in your store may have several options.  For instance, if you sell t-shirts, a visitor to your store should be able to choose the size of the shirt while looking at the main item.  You may also want them to choose a color, style and/or a bunch of other different options.  The challenge with this much flexibility is building something that is easy for the user to understand and easy for the store administrator to maintain.  Satchmo uses option groups and options to create configurable products and product variants.
 
 Option Groups
-+++++++++++++
+^^^^^^^^^^^^^
 
 Continuing on with the shirt example, you will probably end up with some similar options that you want to apply to a large number of products.  For instance, all of your shirts are going to have sizes of Small, Medium and Large.  Instead of adding all three of these to each item, you can create an option group and add that grouping to the item.  Maintenance is much easier this way.
 
@@ -183,7 +197,7 @@ Sort Order
     This helps you order the options in the way you would like them displayed.  For instance, you may want colors to show before sizes.
 
 Options
-++++++++++++
+^^^^^^^
 
 In our example, if an option group is size, then the options would be "small", "medium" or "large."  The nice thing about these options is that you can configure these to change the price of your product.  If a large shirt costs more than a small shirt, then you can assign the incremental cost to the "large" option item and the correct price will be shown in the users cart and order.
 
@@ -201,7 +215,7 @@ Price Change
    single: Configurable Product
 
 Configurable Products
-+++++++++++++++++++++
+^^^^^^^^^^^^^^^^^^^^^
 
 ConfigurableProduct is a modifier for a product that allows you to associate an OptionGroup with a particular Product.
 
@@ -219,7 +233,7 @@ Variations
    single: Product Variation
    
 Product Variations
-++++++++++++++++++
+^^^^^^^^^^^^^^^^^^
 
 As described above a ProductVariation can be thought of as the actual product you maintain in inventory and sell to a customer.  It is an item with all of the options applied.  In our example case, it might be a Large, White Shirt. The ProductVariation object itself only has links between a ConfigurableProduct, and a Product.
 
@@ -228,9 +242,10 @@ As described above a ProductVariation can be thought of as the actual product yo
    single: Downloadable Product
 
 Downloadable Product
-++++++++++++++++++++
+^^^^^^^^^^^^^^^^^^^^
 
-A downloadable product is a virtual product that will be electronically delivered to a customer after the purchase is completed.  In Satchmo, this is accomplished by sending a unique url to a customer after the purchase.  This url can be restricted so that the possibility of multiple downloads is minimized.  Depending on your product you may want to add additional security controls but that is outside the scope of Satchmo.
+A downloadable product is a virtual product that will be electronically delivered to a customer after the purchase is completed.  
+In Satchmo, this is accomplished by emailing a unique url to a customer after the purchase.  This url can be restricted so that the possibility of multiple downloads is minimized.  Depending on your product you may want to add additional security controls but that is outside the scope of Satchmo.
 
 In order to use a downloadable product, you need to make sure you have a Product created as described above.  Also, make sure that you have the Downloadable Product type enabled in the configuration settings.
 
@@ -238,7 +253,7 @@ From the Product detail page, choose "Add Downloadable Product"
 
 This screen will allow you to upload your file and specifiy the number of allowed downloads, the number of minutes it will remain active and a final flag for whether or not the file is still active.  After saving the changes, the product will be enabled for downloading.
 
-In order for the downloadable product to be secured, you must make sure that your web server supports the x-send-file header.  Both Apache and lighttpd do but you'll need to refer to the web server documentation for details.  Lighttpd natively supports this but Apache needs mod_xsendfile to work correctly.
+In order for the downloadable product to be secured, you must make sure that your web server supports the x-send-file header.  Both Apache, lighttpd and nginx do but you'll need to refer to the web server documentation for details.  Lighttpd and nginx natively supports this but Apache needs mod_xsendfile to work correctly.
 
 In addition to configuring the x-send-file header, you will need to ensure that the protected directory can not be browsed to directly.  An example lighttpd configuration is::
 
@@ -251,7 +266,8 @@ In addition to configuring the x-send-file header, you will need to ensure that 
    single: Custom Product
    
 Custom Product
-++++++++++++++
+^^^^^^^^^^^^^^
+
 A custom product is one that is typically assembled or made to order based on the customer's needs. A common situation is a computer configurator that allows a customer to tailor the computer to their needs. Once the order is submitted the store owner will then build or configure that product. 
 
 Once you have created a product as described above, you may wish to use it as a basis for a custom product. The most important additional information you need to associate with your product is the option groups or custom text fields the customer may use to create their product. The option groups are no different from the ones described above. This gives you tremendous flexibility to vary the price of the product based on the chosen options. The custom text fields are free form text fields meant to capture special notes or instructions related to the order.
@@ -267,7 +283,8 @@ The custom product does not create product variations. The downside of this is t
    single: Subscription product
 
 Subscription Product
-++++++++++++++++++++
+^^^^^^^^^^^^^^^^^^^^
+
 A subscription product is a product type that can be used to manage recurring billing memberships or to add payment terms to a non-membership product.
 
 In order to use this product,make sure you have the Subscription Product type enabled in the configuration settings. Additionally, if you would like to use a url to activate the rebilling, you will need to make sure the the setting ALLOW_URL_REBILL is set to True. If you do set it to True, make sure that you add a new unique key in the CRON_KEY setting.
@@ -283,9 +300,14 @@ Recurring Billing
 
 Recurring Times
     Enter an integer here to limit the number of times your customer will be charged. (ie only 10 easy payment of $9.95)
+    If this is a perpetual subscription, enter 99999.
 
 Duration
-    Enter the number of days between each billing cycle.
+    Enter the number of units between between each billing cycle.
+
+Expire Unit
+    This is used in combination with the duration to determine whether the timing should be in months or days. For example,
+    if you want to bill monthly for a year, you could set it to a duration of 12 and Expire Unit of monthly.
 
 Shippable?
     The shipping charges, if any, that will be charged to your customer.
@@ -300,13 +322,24 @@ Trial Terms:
         You can add as many trial periods as you wish, unless you are using paypal as a payment option.  PayPal can only accept 2 trial periods.  If you are using PayPal, do not add more than 2 trial periods!
 
 Cronjob:
-In order for recurring billing to work, you need to setup a cronjob on your server to run once a day (preferably in the middle of the night).  Use settings similar to these:
 
-    0 23 * * * /usr/bin/lynx -source http://yourdomain.com/shop/checkout/cron/?key=YOURPASSKEY
-    You will need to set the CRON_KEY variable in your settings file to your desired passphrase.
+    
+    In order for recurring billing to work, you need to setup a cronjob on your server to run once a day 
+    (preferably in the middle of the night).  There are a couplf of options to do this.
+    
+    Using satchmo's custom management command::
+    
+        0 23 * * * python manage.py satchmo_bill_recurring
+    
+    Using lynx::
 
-Alternatively, you can run the rebilling script as a shell script.  In that case, your cron job would look like this:
-    0 23 * * * sh /path/to/satchmo/rebilling_cron.sh
+        0 23 * * * /usr/bin/lynx -source http://yourdomain.com/shop/checkout/cron/?key=YOURPASSKEY
+        You will need to set the CRON_KEY variable in your settings file to your desired passphrase.
+
+    Using a shell script::
+
+        0 23 * * * sh /path/to/satchmo/rebilling_cron.sh
+
     If you use this method, make sure to edit the path on the first line of rebilling_cron.sh to point to the directory containing the script.
 
 .. index::
@@ -314,7 +347,8 @@ Alternatively, you can run the rebilling script as a shell script.  In that case
    single: Gift certificate
    
 Gift Certificate Product
-++++++++++++++++++++++++
+^^^^^^^^^^^^^^^^^^^^^^^^
+
 A gift certificate is a special product. In order to use it, make sure it is an enabled product type and that it is a selected payment method.
 
 Once you have enabled the gift certificate product type and payment methods, you need to create a product as described above. Then, in the product subtypes section, select "Enable GiftCertificateProduct" to turn the product into a gift certificate. Now, a user has the option of purchasing a gift certificate and receiving a unique code that can be applied towards the purchase of a product at your store.
@@ -322,21 +356,7 @@ Once you have enabled the gift certificate product type and payment methods, you
 A short tutorial
 ----------------
 
-Here is a quick step by step overview for adding something to your store.  Hopefully it illustrates how to add products and use the concepts described above.
-
- - From the admin interface, add a new individual Product
- - Choose the appropriate Category, Name, etc.  For illustration purposes, create a Satchmo Developer Book  
- - Be sure to put in a value for the price ($25.00) with no expiration or quantity.  Then click save
- - You should see a list of all your products
- - Click on the Satchmo Developer Book
- - At the bottom of your screen, you'll see the option to "Add ConfigurableProduct"  
- - Click on the link
- - Select the appropriate Option Group (Book Type) and click Save & Continue Editing
- - Check "Create Variations" and Click the save button
-
-You've now created all the Product Variants for the Satchmo Developer
-Handbook.  If you want to tweak specific ProductVariants you can but you
-don't have to. 
+For a more detailed tutorial that covers how to add a product, please review this :doc:`tutorial <tutorial1>`. 
 
 The product variation manager contains a set of helper functions for managing product variations.
 It is accessed at /product/admin/variations/ and provides a streamlined process for managing all of 

@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}{% if not is_popup %}
 <div class="breadcrumbs">
-     <a href="/admin/">{% trans "Home" %}</a> &rsaquo;
+     <a href="{% url admin:index %}">{% trans "Home" %}</a> &rsaquo;
      <a href="{% url satchmo_admin_variation_list %}">{% trans 'Product Variation Manager' %}</a>
 </div>
 {% endif %}{% endblock %}
@@ -16,8 +16,8 @@
 	#variation_options li {	list-style: none; }
 	</style>
 	{% blackbird_logging %}
-    <script type="text/javascript" src="{{media_url}}js/jquery.js"></script>
-    <script type="text/javascript" src="{{media_url}}js/jquery.form.js"></script>
+    {% include "shop/_jquery.html" %}
+    {% include "shop/_jquery_form.html" %}
     <script type="text/javascript">
     var satchmo = satchmo || {};
     
@@ -128,7 +128,7 @@
 							var changed = (oldval != newval);
 						}
 						if (changed) {
-							log.debug('Dirty ' + key);		            
+							try { log.debug('Dirty ' + key); } catch(err) {};		            
 							dirty[key] = true;
 							dirty_ids.push(key);
 						}
@@ -245,7 +245,7 @@
     </p>
     {% endblocktrans %}
 </div>
-<form name="variations" action="{% url satchmo_admin_variation_manager product.slug %}" method="POST">
+<form name="variations" action="{% url satchmo_admin_variation_manager product.id %}" method="POST">
 	{{ form.dirty }}
 <div style="float:left;">
     <table id="variation_options" style="border-right: 1px solid #999; margin-right: 3px;">

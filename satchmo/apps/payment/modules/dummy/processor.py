@@ -5,37 +5,81 @@ interface.
 
 See the authorizenet module for the reference implementation
 """
-from django.utils.translation import ugettext as _
-from payment.utils import record_payment
+from django.utils.translation import ugettext_lazy as _
+from payment.modules.base import BasePaymentProcessor, ProcessorResult
 
-class PaymentProcessor(object):
+class PaymentProcessor(BasePaymentProcessor):
 
     def __init__(self, settings):
-        self.settings = settings
+        super(PaymentProcessor, self).__init__('dummy', settings)
 
-    def prepareData(self, order):
-        self.order = order
-
-    def process(self):
+    def authorize_payment(self, order=None, testing=False, amount=None):
         """
-        Process the transaction and return a tuple:
-            (success/failure, reason code, response text)
+        Make an authorization for an order.  This payment will then be captured when the order
+        is set marked 'shipped'.
+        """
+        if order == None:
+            order = self.order
+
+        if amount is None:
+            amount = order.balance
+
+        cc = order.credit_card
+        if cc:
+            ccn = cc.decryptedCC
+            ccv = cc.ccv
+            if ccn == '4222222222222':
+                if ccv == '222':
+                    self.log_extra('Bad CCV forced')
+                    payment = self.record_failure(amount=amount, transaction_id='2',
+                        reason_code='2', details='CCV error forced')
+                    return ProcessorResult(self.key, False, _('Bad CCV - order declined'), payment)
+                else:
+                    self.log_extra('Setting a bad credit card number to force an error')
+                    payment = self.record_failure(amount=amount, transaction_id='2',
+                        reason_code='2', details='Credit card number error forced')
+                    return ProcessorResult(self.key, False, _('Bad credit card number - order declined'), payment)
+
+        orderauth = self.record_authorization(amount=amount, reason_code="0")
+        return ProcessorResult(self.key, True, _('Success'), orderauth)
+
+    def can_authorize(self):
+        return True
+
+    def capture_payment(self, testing=False, amount=None):
+        """
+        Process the transaction and return a ProcessorResult:
 
         Example:
-        >>> from django.conf import settings
+        >>> from livesettings import config_get_group
+        >>> settings = config_get_group('PAYMENT_DUMMY')
         >>> from payment.modules.dummy.processor import PaymentProcessor
         >>> processor = PaymentProcessor(settings)
         # If using a normal payment module, data should be an Order object.
         >>> data = {}
-        >>> processor.prepareData(data)
+        >>> processor.prepare_data(data)
         >>> processor.process()
-        (True, '0', u'Success')
+        ProcessorResult: DUMMY [Success] Success
         """
-        
-        orderpayment = record_payment(self.order, self.settings, amount=self.order.balance)
 
-        reason_code = "0"
-        response_text = _("Success")
+        orderpayment = self.record_payment(amount=amount, reason_code="0")
+        return ProcessorResult(self.key, True, _('Success'), orderpayment)
 
-        return (True, reason_code, response_text)
 
+    def capture_authorized_payment(self, authorization, amount=None):
+        """
+        Given a prior authorization, capture remaining amount not yet captured.
+        """
+        if amount is None:
+            amount = authorization.remaining()
+
+        orderpayment = self.record_payment(amount=amount, reason_code="0",
+            transaction_id="dummy", authorization=authorization)
+
+        return ProcessorResult(self.key, True, _('Success'), orderpayment)
+
+    def release_authorized_payment(self, order=None, auth=None, testing=False):
+        """Release a previously authorized payment."""
+        auth.complete = True
+        auth.save()
+        return ProcessorResult(self.key, True, _('Success'))

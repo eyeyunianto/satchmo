@@ -9,33 +9,36 @@ from django.template import RequestContext
 from django.utils.translation import ugettext as _
 from django.views.decorators.cache import never_cache
 from livesettings import config_value
-from satchmo_store.shop.models import Order
-from payment.config import payment_live
+from satchmo_store.shop.models import Order, OrderStatus
+from payment.config import gateway_live
 from satchmo_utils.dynamic import lookup_url, lookup_template
 from satchmo_store.shop.models import Cart
 from payment import signals
+from payment.modules.base import ProcessorResult
 import logging
 
 log = logging.getLogger('payment.views')
 
 class ConfirmController(object):
     """Centralizes and manages data used by the confirm views.
-credit_confirm_info = never_cache(credit_confirm_info)
     Generally, this is used by initializing, then calling
     `confirm`.  If defaults need to be overridden, such as
     by setting different templates, or by overriding `viewTax`,
     then do that before calling `confirm`.
     """
 
-    def __init__(self, request, payment_module):
+    def __init__(self, request, payment_module, extra_context={}):
         self.request = request
         self.paymentModule = payment_module
-        processor_module = payment_module.MODULE.load_module('processor')
-        self.processor = processor_module.PaymentProcessor(self.paymentModule)
+        if payment_module:
+            processor_module = payment_module.MODULE.load_module('processor')
+            self.processor = processor_module.PaymentProcessor(self.paymentModule)
+        else:
+            self.processor = None
         self.viewTax = config_value('TAX', 'DEFAULT_VIEW_TAX')
         self.order = None
         self.cart = None
-        self.extra_context = {}
+        self.extra_context = extra_context
                 
         #to override the form_handler, set this
         #otherwise it will use the built-in `_onForm`
@@ -58,12 +61,12 @@ credit_confirm_info = never_cache(credit_confirm_info)
         
         self.templates = {
             'CONFIRM' : 'shop/checkout/confirm.html',
-            'EMPTY_CART': 'shop/checkout/empty_cart',
+            'EMPTY_CART': 'shop/checkout/empty_cart.html',
             '404': 'shop/404.html',
             }
             
                 
-    def confirm(self):
+    def confirm(self, force_post=False):
         """Handles confirming an order and processing the charges.
 
         If this is a POST, then tries to charge the order using the `payment_module`.`processor`
@@ -77,9 +80,11 @@ credit_confirm_info = never_cache(credit_confirm_info)
 
         status = False
 
-        if self.request.method == "POST":
-            self.processor.prepareData(self.order)
-        
+        if force_post or self.request.method == "POST":
+            self.processor.prepare_data(self.order)
+            # This copy command is used to handle an error that can occur
+            # with mod_wsgi. See #951 for more info
+            tmp = self.request.POST.copy()
             if self.process():
                 self.response = self.onSuccess(self)
                 return True
@@ -116,7 +121,7 @@ credit_confirm_info = never_cache(credit_confirm_info)
         controller.order.recalculate_total()
         
         base_env = {
-            'PAYMENT_LIVE' : payment_live(controller.paymentModule),
+            'PAYMENT_LIVE' : gateway_live(controller.paymentModule),
             'default_view_tax' : controller.viewTax,
             'order': controller.order,
             'errors': controller.processorMessage,
@@ -125,8 +130,8 @@ credit_confirm_info = never_cache(credit_confirm_info)
             base_env.update(controller.extra_context)
             
         context = RequestContext(self.request, base_env)
-        return render_to_response(template, context)
-        
+        return render_to_response(template, context_instance=context)
+
     def _onSuccess(self, controller):
         """Handles a success in payment.  If the order is paid-off, sends success, else return page to pay remaining."""
         if controller.order.paid_in_full:
@@ -135,8 +140,18 @@ credit_confirm_info = never_cache(credit_confirm_info)
                 if item.product.is_subscription:
                     item.completed = True
                     item.save()
-            if not controller.order.status:
-                controller.order.add_status(status='Pending', notes = "Order successfully submitted")
+            try:
+                curr_status = controller.order.orderstatus_set.latest()  
+            except OrderStatus.DoesNotExist:
+                curr_status = None
+                
+            if (curr_status is None) or (curr_status.notes and curr_status.status == "New"):
+                controller.order.add_status(status='New', notes = "Order successfully submitted")
+            else:
+                # otherwise just update and save
+                if not curr_status.notes:
+                    curr_status.notes = _("Order successfully submitted")
+                curr_status.save()                
 
             #Redirect to the success page
             url = controller.lookup_url('satchmo_checkout-success')
@@ -149,7 +164,14 @@ credit_confirm_info = never_cache(credit_confirm_info)
 
     def process(self):
         """Process a prepared payment"""
-        self.processorResults, self.processorReasonCode, self.processorMessage = self.processor.process()
+        result = self.processor.process()
+        self.processorResults = result.success
+        if result.payment:
+            reason_code = result.payment.reason_code
+        else:
+            reason_code = ""
+        self.processorReasonCode = reason_code
+        self.processorMessage = result.message
 
         log.info("""Processing %s transaction with %s
         Order %i
@@ -173,20 +195,23 @@ credit_confirm_info = never_cache(credit_confirm_info)
             self.cart = Cart.objects.from_request(self.request)
             if self.cart.numItems == 0 and not self.order.is_partially_paid:
                 template = self.lookup_template('EMPTY_CART')
-                self.invalidate(render_to_response(template, RequestContext(request)))
+                self.invalidate(render_to_response(template,
+                                                   context_instance=RequestContext(self.request)))
                 return False
                 
         except Cart.DoesNotExist:
             template = self.lookup_template('EMPTY_CART')
-            self.invalidate(render_to_response(template, RequestContext(request)))
+            self.invalidate(render_to_response(template,
+                                               context_instance=RequestContext(self.request)))
             return False
 
         # Check if the order is still valid
         if not self.order.validate(self.request):
             context = RequestContext(self.request, 
                 {'message': _('Your order is no longer valid.')})
-            self.invalidate(render_to_response(self.templates['404'], context))
-            
+            self.invalidate(render_to_response(self.templates['404'],
+                                               context_instance=context))
+
         self.valid = True
         signals.confirm_sanity_check.send(self, controller=self)
         return True
@@ -200,4 +225,44 @@ def credit_confirm_info(request, payment_module, template=None):
         controller.templates['CONFIRM'] = template
     controller.confirm()
     return controller.response
+credit_confirm_info = never_cache(credit_confirm_info)
+
+class FakeValue(object):
+    def __init__(self, val):
+        self.value = val
+
+class FreeProcessor(object):
+
+    def __init__(self, key):
+        self.KEY = FakeValue(key)
+        self.LABEL = FakeValue('Free Processor')
+
+    def has_key(*args):
+        return False
+
+        
+class FreeProcessorModule(object):
+    def __init__(self, key):
+        self.KEY = FakeValue(key)
+        self.LABEL = FakeValue('Free Processor Module')
+
+    def prepare_data(self, order, *args, **kwargs):
+        self.order = order
+
+    def process(self, *args, **kwargs):
+        if self.order.paid_in_full:
+            return ProcessorResult('FREE', True, _('Success'))
+        else:
+            return ProcessorResult('FREE', False, _('This order does not have a zero balance'))
     
+
+def confirm_free_order(request, key="FREE", template=None):
+    controller = ConfirmController(request, None)
+    freeproc = FreeProcessor(key)
+    freemod = FreeProcessorModule(key)
+    controller.paymentModule = freeproc
+    controller.processor = freemod
+    if template:
+        controller.templates['CONFIRM'] = template
+    controller.confirm(force_post=True)
+    return controller.response

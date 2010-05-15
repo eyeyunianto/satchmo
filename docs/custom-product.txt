@@ -25,7 +25,7 @@ A basic ``models.py`` file with a custom product model looks like this::
 
     from django.db import models
     from django.utils.translation import ugettext_lazy as _
-    from satchmo.product.models import Product
+    from product.models import Product
 
     class MyNewProduct(models.Model):
         product = models.OneToOneField(Product, verbose_name=_('Product'),
@@ -36,9 +36,6 @@ A basic ``models.py`` file with a custom product model looks like this::
 
         def __unicode__(self):
             return u"MyNewProduct: %s" % self.product.name
-
-        class Admin:
-            pass
 
         class Meta:
             verbose_name = _('My New Product')
@@ -51,7 +48,7 @@ with the name of your app::
 
 
     from django.contrib import admin
-    from my_app.models import MyNewProduct # TODO: Replace app name!
+    from models import MyNewProduct # TODO: Replace app name!
 
     admin.site.register(MyNewProduct)
 
@@ -61,7 +58,7 @@ The ``config.py`` file tells Satchmo about your product model. Replace
 
 
     from django.utils.translation import ugettext_lazy as _
-    from satchmo.configuration import config_get
+    from livesettings import config_get
 
     PRODUCT_TYPES = config_get('PRODUCT', 'PRODUCT_TYPES')
 
@@ -80,7 +77,8 @@ configuration.
 
 2. Run ``python manage.py syncdb`` in your project directory.
 
-3. Add your app name to your project's ``CUSTOM_PRODUCT_MODULES`` setting.
+3. Add the app's dotted name to your project's
+   :ref:`CUSTOM_PRODUCT_MODULES <satchmo_settings_custom_product_modules>`.
 
 4. Enable the new model in Satchmo's settings.
     1. Go to "Edit Site Settings" in the admin app.
@@ -130,9 +128,12 @@ This document should get you started in customizing Satchmo through the product
 model. If you need help with something discussed here or with more advanced
 topics, feel free to ask the `mailing list`_.
 
+There is another possibility for extending the product model using
+model inheritance. You can find more information in the `first installment <http://thisismedium.com/tech/satchmo-diaries-part-one/>`_
+of the Satchmo Diaries.
+
 Finally, if you create a product model that others may find useful, please
 consider contributing it to the Satchmo community.
 
 
-.. _Django ticket 7947: http://code.djangoproject.com/ticket/7947
 .. _mailing list: http://groups.google.com/group/satchmo-users

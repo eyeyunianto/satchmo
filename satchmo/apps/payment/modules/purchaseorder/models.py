@@ -1,8 +1,4 @@
-try:
-    from decimal import Decimal
-except:
-    from django.utils._decimal import Decimal
-
+from decimal import Decimal
 from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext, ugettext_lazy as _
@@ -41,8 +37,6 @@ class PurchaseOrder(models.Model):
         if self.balance is None:
             self.balance = self.order.balance
         super(PurchaseOrder, self).save()
-    
-    
-            
 
 import config
+PAYMENT_PROCESSOR=True

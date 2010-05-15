@@ -1,71 +1,70 @@
-try:
-    from decimal import Decimal
-except:
-    from django.utils._decimal import Decimal
-
-from datetime import datetime, timedelta
-from shipping.utils import update_shipping
-from satchmo_store.shop.models import Order, OrderItem, OrderItemDetail, OrderPayment
+from decimal import Decimal
+from livesettings import config_get
+from livesettings import config_get_group
+from payment import active_gateways
+from satchmo_store.shop.models import Order, OrderItem, OrderItemDetail
 from satchmo_store.shop.signals import satchmo_post_copy_item_to_order
-from socket import error as SocketError
+from shipping.utils import update_shipping
 import logging
 
 log = logging.getLogger('payment.utils')
 
-NOTSET = object()
-
-def create_pending_payment(order, config, amount=NOTSET):
-    """Create a placeholder payment entry for the order.  
-    This is done by step 2 of the payment process."""
-    key = unicode(config.KEY.value)
-    if amount == NOTSET:
-        amount = Decimal("0.00")
-
-    # kill old pending payments
-    payments = order.payments.filter(transaction_id__exact="PENDING", 
-        payment__exact=key)
-    ct = payments.count()
-    if ct > 0:
-        log.debug("Deleting %i expired pending payment entries for order #%i", ct, order.id)
-
-        for pending in payments:
-            pending.delete()
-        
-    log.debug("Creating pending %s payment for %s", key, order)
-
-    orderpayment = OrderPayment(order=order, amount=amount, payment=key, 
-        transaction_id="PENDING")
-    orderpayment.save()
-
-    return orderpayment
-
+def capture_authorizations(order):
+    """Capture all outstanding authorizations on this order"""
+    if order.authorized_remaining > Decimal('0'):
+        purchase = order.get_or_create_purchase()
+        for key, group in active_gateways():
+            gateway_settings = config_get(group, 'MODULE')
+            processor = get_gateway_by_settings(gateway_settings)
+            processor.capture_authorized_payments(purchase)
 
 def get_or_create_order(request, working_cart, contact, data):
-    """Get the existing order from the session, else create using 
+    """Get the existing order from the session, else create using
     the working_cart, contact and data"""
-    shipping = data['shipping']
-    discount = data['discount']
-    
-    try:
-        newOrder = Order.objects.from_request(request)
-        pay_ship_save(newOrder, working_cart, contact,
-            shipping=shipping, discount=discount, update=True)
-        
-    except Order.DoesNotExist:
-        # Create a new order.
-        newOrder = Order(contact=contact)
-        pay_ship_save(newOrder, working_cart, contact,
-            shipping=shipping, discount=discount)
-            
-        request.session['orderID'] = newOrder.id
-    
-    return newOrder
+    shipping = data.get('shipping', None)
+    discount = data.get('discount', None)
 
+    try:
+        order = Order.objects.from_request(request)
+        if order.status != '':
+            # This order is being processed. We should not touch it!
+            order = None
+    except Order.DoesNotExist:
+        order = None
+
+    update = bool(order)
+    if order:
+        # make sure to copy/update addresses - they may have changed
+        order.copy_addresses()
+        order.save()
+        if discount is None and order.discount_code:
+            discount = order.discount_code
+    else:
+        # Create a new order.
+        order = Order(contact=contact)
+
+    pay_ship_save(order, working_cart, contact,
+        shipping=shipping, discount=discount, update=update)
+    request.session['orderID'] = order.id
+    return order
+
+def get_gateway_by_settings(gateway_settings, settings={}):
+    log.debug('getting gateway by settings: %s', gateway_settings.key)
+    processor_module = gateway_settings.MODULE.load_module('processor')
+    gateway_settings = get_gateway_settings(gateway_settings, settings=settings)
+    return processor_module.PaymentProcessor(settings=gateway_settings)
+
+def get_processor_by_key(key):
+    payment_module = config_get_group(key)
+    processor_module = payment_module.MODULE.load_module('processor')
+    return processor_module.PaymentProcessor(payment_module)
 
 def pay_ship_save(new_order, cart, contact, shipping, discount, update=False):
-    """Save the order details, first removing all items if this is an update.
     """
-    update_shipping(new_order, shipping, contact, cart)
+    Save the order details, first removing all items if this is an update.
+    """
+    if shipping:
+        update_shipping(new_order, shipping, contact, cart)
 
     if not update:
         # Temp setting of the tax and total so we can save it
@@ -80,41 +79,6 @@ def pay_ship_save(new_order, cart, contact, shipping, discount, update=False):
         new_order.discount_code = ""
 
     update_orderitems(new_order, cart, update=update)
-
-
-def record_payment(order, config, amount=NOTSET, transaction_id=""):
-    """Convert a pending payment into a real payment."""
-    key = unicode(config.KEY.value)
-    if amount == NOTSET:
-        amount = order.balance
-        
-    log.debug("Recording %s payment of %s for %s", key, amount, order)
-    payments = order.payments.filter(transaction_id__exact="PENDING", 
-        payment__exact=key)
-    ct = payments.count()
-    if ct == 0:
-        log.debug("No pending %s payments for %s", key, order)
-        orderpayment = OrderPayment(order=order, amount=amount, payment=key,
-            transaction_id=transaction_id)
-    
-    else:
-        orderpayment = payments[0]
-        orderpayment.amount = amount
-        orderpayment.transaction_id = transaction_id
-
-        if ct > 1:
-            for payment in payments[1:len(payments)]:
-                payment.transaction_id="ABORTED"
-                payment.save()
-            
-    orderpayment.time_stamp = datetime.now()
-    orderpayment.save()
-    
-    if order.paid_in_full:
-        order.order_success()
-    
-    return orderpayment
-
 
 def update_orderitem_details(new_order_item, item):
     """Update orderitem details, if any.

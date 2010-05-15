@@ -1,14 +1,20 @@
 """Protx checkout custom views"""
 
+from django import http
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 from django.utils.translation import ugettext as _
 from livesettings import config_get_group
 from payment.views import payship, confirm
 import logging
+from satchmo_utils.dynamic import lookup_template
 
 log = logging.getLogger('protx.views')
     
 def pay_ship_info(request):
-    return payship.credit_pay_ship_info(request, config_get_group('PAYMENT_PROTX'), template="shop/checkout/protx/pay_ship.html")
+    return payship.credit_pay_ship_info(request, 
+            config_get_group('PAYMENT_PROTX'),
+            template="shop/checkout/protx/pay_ship.html")
     
 def confirm_info(request, template='shop/checkout/protx/confirm.html', extra_context={}):
     payment_module = config_get_group('PAYMENT_PROTX')
@@ -38,14 +44,14 @@ def confirm_secure3d(request, secure3d_template='shop/checkout/secure3d_form.htm
         if request.method == "POST":
             returnMD = request.POST.get('MD', None)
             if not returnMD:
-                template = payment_module.lookup_template(secure3d_template)
-                ctx ={'order': controller.order, 'auth': auth3d }
-                return render_to_response(template, ctx, RequestContext(request))
-            
+                template = lookup_template(payment_module, secure3d_template)
+                ctx = RequestContext(request, {'order': controller.order, 'auth': auth3d })
+                return render_to_response(template, context_instance=ctx)
+
             elif returnMD == auth3d['MD']:
                 pares = request.POST.get('PaRes', None)
-                controller.processor.prepareData(controller.order)
-                controller.processor.prepareData3d(returnMD, pares)
+                controller.processor.prepare_data(controller.order)
+                controller.processor.prepare_data3d(returnMD, pares)
                 if controller.process():
                     return controller.onSuccess(controller)
                 else:
@@ -55,8 +61,8 @@ def confirm_secure3d(request, secure3d_template='shop/checkout/secure3d_form.htm
             ctx =RequestContext(request, {
                 'order': controller.order, 'auth': auth3d 
                 })
-            return render_to_response(template, ctx)                
-                    
+            return render_to_response(template, context_instance=ctx)
+
     return secure3d_form_handler(controller)
 
 def secure3d_form_handler(controller):
@@ -65,11 +71,11 @@ def secure3d_form_handler(controller):
     
     if controller.processorReasonCode == '3DAUTH':
         log.debug('caught secure 3D request for order #%i, putting 3D into session as %s', 
-            controller.order.id, controller.processorResponse)
+            controller.order.id, controller.processorReasonCode)
             
         redirectUrl = controller.lookup_url('satchmo_checkout-secure3d')
-        processor.response['TermUrl'] = redirectUrl
-        request.session['3D'] = processor.last_response
+        controller.processor.response['TermUrl'] = redirectUrl
+        controller.request.session['3D'] = controller.processorReasonCode
         return http.HttpResponseRedirect(redirectUrl)
     
-    return controller._onForm(controller)
+    return controller.onForm(controller)

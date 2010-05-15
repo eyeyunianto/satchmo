@@ -4,16 +4,31 @@ class Command(NoArgsCommand):
     help = "Load sample store data for satchmo."
 
     def handle_noargs(self, **options):
-        from satchmo_store.contact.models import Contact, AddressBook, PhoneNumber
-        from product.models import Product, Price, ConfigurableProduct, ProductVariation, Category, OptionGroup, Option, ProductImage#, DownloadableProduct
-        from satchmo_store.contact.supplier.models import Organization
+        from satchmo_store.contact.models import (
+            AddressBook,
+            Contact,
+            ContactOrganization,
+            ContactOrganizationRole,
+            ContactRole,
+            Organization,
+            PhoneNumber,
+        )
+        from product.models import (
+            Category,
+            OptionGroup,
+            Option,
+            Price,
+            Product,
+        )
+        from product.modules.configurable.models import ConfigurableProduct
+
         from satchmo_store.shop.models import Config
         from django.conf import settings
         from l10n.models import Country
         from django.contrib.sites.models import Site
         from django.contrib.auth.models import User
         #idempotency test
-        
+
         print "Checking for existing sample data."
         try:
             p = Product.objects.get(slug="dj-rocks")
@@ -24,7 +39,7 @@ class Command(NoArgsCommand):
             pass
 
         print "Loading sample store data."
-        
+
         #Load basic configuration information
 
         print "Creating site..."
@@ -44,11 +59,13 @@ class Command(NoArgsCommand):
         config.save()
         print "Creating Customers..."
         # Import some customers
-        c1 = Contact(first_name="Chris", last_name="Smith", email="chris@aol.com", role="Customer", notes="Really cool stuff")
+
+        customer = ContactRole.objects.get(pk='Customer')
+        c1 = Contact(first_name="Chris", last_name="Smith", email="chris@aol.com", role=customer, notes="Really cool stuff")
         c1.save()
         p1 = PhoneNumber(contact=c1, phone="601-555-5511", type="Home",primary=True)
         p1.save()
-        c2 = Contact(first_name="John", last_name="Smith", email="abc@comcast.com", role="Customer", notes="Second user")
+        c2 = Contact(first_name="John", last_name="Smith", email="abc@comcast.com", role=customer, notes="Second user")
         c2.save()
         p2 = PhoneNumber(contact=c2, phone="999-555-5111", type="Work",primary=True)
         p2.save()
@@ -62,16 +79,22 @@ class Command(NoArgsCommand):
         a2.save()
         print "Creating Suppliers..."
         #Import some suppliers
-        org1 = Organization(name="Rhinestone Ronny", type="Company",role="Supplier")
+
+        supplier = ContactOrganizationRole.objects.get(pk='Supplier')
+        company = ContactOrganization.objects.get(pk='Company')
+        contactsupplier = ContactRole.objects.get(pk='Supplier')
+        org1 = Organization(name="Rhinestone Ronny", type=company, role=supplier)
         org1.save()
-        c4 = Contact(first_name="Fred", last_name="Jones", email="fj@rr.com", role="Supplier", organization=org1)
+        c4 = Contact(first_name="Fred", last_name="Jones", email="fj@rr.com",
+            role=contactsupplier, organization=org1)
         c4.save()
         p4 = PhoneNumber(contact=c4,phone="800-188-7611", type="Work", primary=True)
         p4.save()
         p5 = PhoneNumber(contact=c4,phone="755-555-1111",type="Fax")
         p5.save()
-        a3 = AddressBook(contact=c4, description="Mailing address", street1="Receiving Dept", street2="918 Funky Town St", city="Fishkill",
-                         state="NJ", country=us, postal_code="19010")
+        a3 = AddressBook(contact=c4, description="Mailing address", street1="Receiving Dept",
+            street2="918 Funky Town St", city="Fishkill",
+             state="NJ", country=us, postal_code="19010")
         a3.save()
         #s1 = Supplier(name="Rhinestone Ronny", address1="918 Funky Town St", address2="Suite 200",
         #              city="Fishkill", state="NJ", zip="19010", phone1="800-188-7611", fax="900-110-1909", email="ron@rhinestone.com",
@@ -111,24 +134,24 @@ class Command(NoArgsCommand):
         p1.save()
         i1.category.add(cat1)
         i1.save()
-        i2 = Product(site=site, name="Python Rocks shirt", slug="PY-Rocks", 
-            description="Really cool python shirt - One Size Fits All", 
+        i2 = Product(site=site, name="Python Rocks shirt", slug="PY-Rocks",
+            description="Really cool python shirt - One Size Fits All",
             active=True, featured=True)
         i2.save()
         p2 = Price(price="19.50", product=i2)
         p2.save()
         i2.category.add(cat2)
         i2.save()
-        i3 = Product(site=site, name="A really neat book", slug="neat-book", 
-            description="A neat book.  You should buy it.", 
+        i3 = Product(site=site, name="A really neat book", slug="neat-book",
+            description="A neat book.  You should buy it.",
             active=True, featured=True)
         i3.save()
         p3 = Price(price="5.00", product=i3)
         p3.save()
         i3.category.add(cat4)
         i3.save()
-        i4 = Product(site=site, name="Robots Attack!", slug="robot-attack", 
-            description="Robots try to take over the world.", 
+        i4 = Product(site=site, name="Robots Attack!", slug="robot-attack",
+            description="Robots try to take over the world.",
             active=True, featured=True)
         i4.save()
         p4 = Price(price="7.99", product=i4)
@@ -212,7 +235,7 @@ class Command(NoArgsCommand):
         #set prices for full and upgrade versions of neat-software, this is an alternative to using the price_change in options, it allows for more flexability when required.
     #    pv1 = pg5.get_product_from_options([optItem4a])
     #    Price(product=pv1, price='5.00').save()
-    #    Price(product=pv1, price='2.00', quantity=50).save()
+    #    Price(product=pv1, price='2.00', quantity='50.00').save()
     #    DownloadableProduct(product=pv1).save()
 
     #    pv2 = pg5.get_product_from_options([optItem4b])

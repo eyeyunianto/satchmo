@@ -1,12 +1,9 @@
-try:
-    from decimal import Decimal, InvalidOperation
-except:
-    from django.utils._decimal import Decimal, InvalidOperation
-
+from decimal import Decimal, InvalidOperation
 from django.contrib.sites.models import Site
 from django.db.models import Q
-from product.models import Product, Category
+from product.models import Product, Category, Discount
 import logging
+
 log = logging.getLogger('search listener')
 
 def default_product_search_listener(sender, request=None, category=None, keywords=[], results={}, **kwargs):
@@ -18,19 +15,19 @@ def default_product_search_listener(sender, request=None, category=None, keyword
     site = Site.objects.get_current()
     products = Product.objects.all()
     productkwargs = {
-        'productvariation__parent__isnull' : True,
+        #'productvariation__parent__isnull' : True,
         'active' : True,
         'site' : site
     }
 
     if category:
-        categories = Category.objects.filter(slug=category)
+        categories = Category.objects.active().filter(slug=category)
         if categories:
             categories = categories[0].get_active_children(include_self=True)
         
         productkwargs['category__in'] = categories
     else:
-        categories = Category.objects.all()
+        categories = Category.objects.active()
 
     for keyword in keywords:
         if not category:
@@ -47,7 +44,7 @@ def default_product_search_listener(sender, request=None, category=None, keyword
             | Q(meta__icontains=keyword)
             | Q(sku__iexact=keyword),
             **productkwargs)
-                            
+
     results.update({
         'categories': categories, 
         'products': products
@@ -97,3 +94,19 @@ def priceband_search_listener(sender, request=None, category=None, keywords=[], 
     categories = categories.filter(product__in = priced)
     results['products'] = priced
     results['categories'] = categories
+
+def discount_used_listener(sender, order=None, **kwargs):
+    """If an order has a discount, increment numUses on it.
+    
+    satchmo_store.shop.signals.order_success listener set up in shop.listeners.
+    """
+    if order.discount_code:
+        try:
+            discount = Discount.objects.by_code(order.discount_code)
+            if discount.numUses:
+                discount.numUses += 1
+            else:
+                discount.numUses = 1
+            discount.save()
+        except Discount.DoesNotExist:
+            pass

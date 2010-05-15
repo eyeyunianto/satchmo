@@ -12,12 +12,14 @@ import sys
 DIRNAME = os.path.dirname(__file__)
 APPDIR = os.path.join(DIRNAME, 'satchmo/apps')
 if not APPDIR in sys.path:
-    sys.path.append(APPDIR)
+    sys.path.insert(0,APPDIR)
 
 # Dynamically calculate the version based on django.VERSION.
 version = __import__('satchmo_store').__version__
 packages = find_packages('satchmo/apps')
 packages.append('static')
+packages.append('docs')
+packages.append('satchmo_skeleton')
 
 setup(name = "Satchmo",
       version = version,
@@ -28,9 +30,15 @@ setup(name = "Satchmo",
       description = "The webshop for perfectionists with deadlines.",
       long_description = "Satchmo is an ecommerce framework created using Django.",
       include_package_data = True,
+      zip_safe = False,
       package_dir = {
-      '' : 'satchmo/apps'
+      '' : 'satchmo/apps',
+      'static' : 'satchmo/static',
+      'docs' : 'docs',
+      'satchmo_skeleton' : 'satchmo/projects/skeleton',
       },
+      scripts=['scripts/clonesatchmo.py'],
+      setup_requires=["setuptools_hg"],
       packages = packages,
       classifiers = [
       'Development Status :: 4 - Beta',

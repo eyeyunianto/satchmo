@@ -60,9 +60,11 @@ CACHE_BACKEND = "locmem:///"
 CACHE_TIMEOUT = 60*5
 CACHE_PREFIX = "S"
 
+ACCOUNT_ACTIVATION_DAYS = 7
+
 #Configure logging
 LOGFILE = "satchmo.log"
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%a, %d %b %Y %H:%M:%S')
 
@@ -71,4 +73,5 @@ logging.basicConfig(level=logging.INFO,
 # add the handler to the root logger
 #logging.getLogger('').addHandler(fileLog)
 logging.getLogger('keyedcache').setLevel(logging.INFO)
+logging.getLogger('l10n').setLevel(logging.INFO)
 logging.info("Satchmo Started")

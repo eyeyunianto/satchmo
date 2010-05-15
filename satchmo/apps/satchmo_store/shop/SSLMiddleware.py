@@ -43,6 +43,15 @@ views pass through the middleware you can specify the only secure paths and the
 remaining paths can be assumed to be unsecure and handled by the middleware.
 
 This package is inspired by Antonio Cavedoni's SSL Middleware
+
+Satchmo notes:
+This package has also merged the main concepts of Antonio Cavedoni's SSL Middleware, 
+to allow for better integration with other sites, and to easily allow admin pages to
+be secured.
+
+Lastly, we've added an optional "SSL_PORT" to be specified in the settings, for
+unusual server configurations.  If specified, the port will be sent with the
+SSL redirect.
 """
 
 __license__ = "Python"
@@ -51,10 +60,11 @@ __author__ = "Stephen Zabel"
 
 from django.conf import settings
 from django.http import HttpResponseRedirect, get_host
-from satchmo_store.shop.models import Config
 from satchmo_utils import request_is_secure
 
+HTTPS_PATHS = getattr(settings, "HTTPS_PATHS", [])
 SSL = 'SSL'
+SSLPORT=getattr(settings, 'SSL_PORT', None)
 
 class SSLRedirect:
     def process_view(self, request, view_func, view_args, view_kwargs):
@@ -63,6 +73,12 @@ class SSLRedirect:
             del view_kwargs[SSL]
         else:
             secure = False
+            
+        if not secure:
+            for path in HTTPS_PATHS:
+                if request.path.startswith("/%s" % path):
+                    secure = True
+                    break
 
         if not secure == request_is_secure(request):
             return self._redirect(request, secure)
@@ -74,7 +90,14 @@ class SSLRedirect:
 Please structure your views so that redirects only occur during GETs.""")
 
         protocol = secure and "https" or "http"
+        host = "%s://%s" % (protocol, get_host(request))
+        # In certain proxying situations, we need to strip out the 443 port
+        # in order to prevent inifinite redirects
+        if not secure:
+            host = host.replace(':443','')
+        if secure and SSLPORT:
+            host = "%s:%s" % (host, SSLPORT)
             
-        newurl = "%s://%s%s" % (protocol,get_host(request),request.get_full_path())
+        newurl = "%s%s" % (host, request.get_full_path())
 
         return HttpResponseRedirect(newurl)

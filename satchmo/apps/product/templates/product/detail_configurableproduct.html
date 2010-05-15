@@ -1,6 +1,6 @@
 {% extends "product/product.html" %}
 {% load i18n %}
-{% load satchmo_thumbnail %}
+{% load thumbnail %}
 {% load satchmo_price %}
 {% load satchmo_util %}
 {% load satchmo_currency satchmo_category%}
@@ -9,8 +9,8 @@
 
 {% block extra-head %}
 
-<script type="text/javascript" src="{{media_url}}js/jquery.js"></script>
-<script type="text/javascript" src="{{media_url}}js/jquery.form.js"></script>
+{% include "shop/_jquery.html" %}
+{% include "shop/_jquery_form.html" %}
 <script type="text/javascript" src="{{media_url}}js/satchmo_product.js"></script>
 {% blackbird_logging %}
 <script type="text/javascript">{# Javascript which is generated uniquely for each page #}
@@ -36,13 +36,14 @@ $(function() {
 	{% endspaceless %}</h3>
 
 {% for pic in product.productimage_set.all %}
-    <img src="{{ pic.picture.url|thumbnail:"width=280" }}" width="280" />
+    {% thumbnail pic.picture 280x280 as image %}
+    <img src="{{ image }}" width="{{ image.width }}" height="{{ image.height }}" />
 {% endfor %}
 
 {% with product.translated_attributes as atts %}{% if atts %}
 <p class="productattributes">
 {% for att in product.translated_attributes %}
-{{ att.name }}: {{ att.value }}<br/>
+{{ att.description }}: {{ att.value }}<br/>
 {% endfor %}
 </p>
 {% endif %}{% endwith %}

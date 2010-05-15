@@ -1,6 +1,4 @@
-import logging
-import urllib2
-
+from decimal import Decimal
 from django.core import urlresolvers
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -8,17 +6,17 @@ from django.template import RequestContext
 from django.utils.http import urlencode
 from django.utils.translation import ugettext as _
 from django.views.decorators.cache import never_cache
+from livesettings import config_get_group, config_value 
+from payment.config import gateway_live
+from payment.utils import get_processor_by_key
+from payment.views import payship
+from satchmo_store.shop.models import Cart
+from satchmo_store.shop.models import Order, OrderPayment
+from satchmo_utils.dynamic import lookup_url, lookup_template
 from sys import exc_info
 from traceback import format_exception
-
-from livesettings import config_get_group
-from livesettings import config_value 
-from satchmo_store.shop.models import Order, OrderPayment
-from payment.utils import record_payment, create_pending_payment
-from payment.views import payship
-from payment.config import payment_live
-from satchmo_store.shop.models import Cart
-from satchmo_utils.dynamic import lookup_url, lookup_template
+import logging
+import urllib2
 
 log = logging.getLogger()
 
@@ -39,15 +37,16 @@ def confirm_info(request):
         return HttpResponseRedirect(url)
 
     tempCart = Cart.objects.from_request(request)
-    if tempCart.numItems == 0:
+    if tempCart.numItems == 0 and not order.is_partially_paid:
         template = lookup_template(payment_module, 'shop/checkout/empty_cart.html')
-        return render_to_response(template, RequestContext(request))
+        return render_to_response(template,
+                                  context_instance=RequestContext(request))
 
     # Check if the order is still valid
     if not order.validate(request):
         context = RequestContext(request,
-            {'message': _('Your order is no longer valid.')})
-        return render_to_response('shop/404.html', context)
+                                 {'message': _('Your order is no longer valid.')})
+        return render_to_response('shop/404.html', context_instance=context)
 
     template = lookup_template(payment_module, 'shop/checkout/paypal/confirm.html')
     if payment_module.LIVE.value:
@@ -63,15 +62,17 @@ def confirm_info(request):
             payment_module.RETURN_ADDRESS.value, include_server=True)
     except urlresolvers.NoReverseMatch:
         address = payment_module.RETURN_ADDRESS.value
-        
-    create_pending_payment(order, payment_module)
+    
+    processor_module = payment_module.MODULE.load_module('processor')
+    processor = processor_module.PaymentProcessor(payment_module)
+    processor.create_pending_payment(order=order)
     default_view_tax = config_value('TAX', 'DEFAULT_VIEW_TAX') 
   
     recurring = None
     order_items = order.orderitem_set.all()
     for item in order_items:
         if item.product.is_subscription:
-            recurring = {'product':item.product, 'price':item.product.price_set.all()[0].price,}
+            recurring = {'product':item.product, 'price':item.product.price_set.all()[0].price.quantize(Decimal('.01')),}
             trial0 = recurring['product'].subscriptionproduct.get_trial_terms(0)
             if len(order_items) > 1 or trial0 is not None or recurring['price'] < order.balance:
                 recurring['trial1'] = {'price': order.balance,}
@@ -94,10 +95,10 @@ def confirm_info(request):
      'return_address': address,
      'invoice': order.id,
      'subscription': recurring,
-     'PAYMENT_LIVE' : payment_live(payment_module)
+     'PAYMENT_LIVE' : gateway_live(payment_module)
     })
 
-    return render_to_response(template, ctx)
+    return render_to_response(template, context_instance=ctx)
 confirm_info = never_cache(confirm_info)
 
 def ipn(request):
@@ -138,9 +139,9 @@ def ipn(request):
             # If the payment hasn't already been processed:
             order = Order.objects.get(pk=invoice)
             
-            order.add_status(status='Pending', notes=_("Paid through PayPal."))
-            payment_module = config_get_group('PAYMENT_PAYPAL')
-            record_payment(order, payment_module, amount=gross, transaction_id=txn_id)
+            order.add_status(status='New', notes=_("Paid through PayPal."))
+            processor = get_processor_by_key('PAYMENT_PAYPAL')
+            payment = processor.record_payment(order=order, amount=gross, transaction_id=txn_id)
             
             if 'memo' in data:
                 if order.notes:
@@ -182,6 +183,7 @@ def confirm_ipn_data(data, PP_URL):
         log.info("PayPal IPN data verification was successful.")
     else:
         log.info("PayPal IPN data verification failed.")
+        log.debug("HTTP code %s, response text: '%s'" % (fo.code, ret))
         return False
 
     return True

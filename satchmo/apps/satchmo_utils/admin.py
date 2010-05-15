@@ -11,7 +11,6 @@ from django.db import models
 from django.db.models.query import QuerySet
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.models import Message
 from django.http import HttpResponse, HttpResponseNotFound
 from django.utils.encoding import smart_str
 from django.utils.safestring import mark_safe
@@ -21,15 +20,19 @@ import operator
 
 class ForeignKeySearchInput(forms.HiddenInput):
     """
-    A Widget for displaying ForeignKeys in an autocomplete search input 
+    A Widget for displaying ForeignKeys in an autocomplete search input
     instead in a <select> box.
     """
+
+    to_string_function = lambda s: truncate_words(s, 14)
+
     class Media:
         css = {
             'all': ('css/jquery.autocomplete.css',)
         }
         js = (
-            'js/jquery.js',
+            # The js/jquery.js script is referenced in admin/base_site.html template.
+            # Requesting it here again would reset all the plugins loaded afterwards.
             'js/jquery.bgiframe.js',
             'js/jquery.ajaxQueue.js',
             'js/jquery.autocomplete.js'
@@ -38,11 +41,12 @@ class ForeignKeySearchInput(forms.HiddenInput):
     def label_for_value(self, value):
         key = self.rel.get_related_field().name
         obj = self.rel.to._default_manager.get(**{key: value})
-        return truncate_words(obj, 14)
+        return self.to_string_function(obj)
 
-    def __init__(self, rel, search_fields, attrs=None):
+    def __init__(self, rel, search_fields, to_string_function, attrs=None):
         self.rel = rel
         self.search_fields = search_fields
+        if to_string_function: self.to_string_function = to_string_function
         super(ForeignKeySearchInput, self).__init__(attrs)
 
     def render(self, name, value, attrs=None):
@@ -65,20 +69,23 @@ class ForeignKeySearchInput(forms.HiddenInput):
                     display: none;
                 }
             </style>
-<input type="text" id="lookup_%(name)s" value="%(label)s" />
+<input type="text" id="lookup_%(name)s" value="%(label)s"/>
 <a href="#" id="del_%(name)s">
 <img src="%(admin_media_prefix)simg/admin/icon_deletelink.gif" />
 </a>
 <script type="text/javascript">
-            if ($('#lookup_%(name)s').val()) {
+            var lookup = $('#lookup_%(name)s')
+            if (lookup.val()) {
                 $('#del_%(name)s').show()
             }
-            $('#lookup_%(name)s').autocomplete('../search/', {
+            lookup.attr('size', Math.max(40, lookup.attr('value').length))
+            lookup.autocomplete('../search/', {
+                formatResult: function(data){ return $('<div />').html(data[0]).text(); },
                 extraParams: {
                     search_fields: '%(search_fields)s',
                     app_label: '%(app_label)s',
-                    model_name: '%(model_name)s',
-                },
+                    model_name: '%(model_name)s'
+                }
             }).result(function(event, data, formatted) {
                 if (data) {
                     $('#id_%(name)s').val(data[1]);
@@ -118,15 +125,31 @@ class AutocompleteAdmin(admin.ModelAdmin):
     related_string_functions = {}
 
     def __call__(self, request, url):
+        # This is deprecated interface and will be dropped in Django 1.3.
+        # Since the version 1.1, Django uses get_urls() method below.
         if url is None:
             pass
         elif url == 'search':
             return self.search(request)
         return super(AutocompleteAdmin, self).__call__(request, url)
 
+    def get_urls(self):
+        from django.conf.urls.defaults import url
+        patterns = super(AutocompleteAdmin, self).get_urls()
+        info = self.admin_site.name, self.model._meta.app_label, self.model._meta.module_name
+        patterns.insert(
+                -1,     # insert just before (.+) rule (see django.contrib.admin.options.ModelAdmin.get_urls)
+                url(
+                    r'^search/$',
+                    self.search,
+                    name='%sadmin_%s_%s_search' % info
+                    )
+                )
+        return patterns
+
     def search(self, request):
         """
-        Searches in the fields of the given related model and returns the 
+        Searches in the fields of the given related model and returns the
         result as a simple string to be used by the jQuery Autocomplete plugin
         """
         query = request.GET.get('q', None)
@@ -171,6 +194,10 @@ class AutocompleteAdmin(admin.ModelAdmin):
         """
         if isinstance(db_field, models.ForeignKey) and \
                 db_field.name in self.related_search_fields:
-            kwargs['widget'] = ForeignKeySearchInput(db_field.rel,
-                                    self.related_search_fields[db_field.name])
-        return super(AutocompleteAdmin, self).formfield_for_dbfield(db_field, **kwargs)
+            kwargs['widget'] = ForeignKeySearchInput(
+                    db_field.rel,
+                    self.related_search_fields[db_field.name],
+                    self.related_string_functions.get(db_field.name),
+                    )
+        field = super(AutocompleteAdmin, self).formfield_for_dbfield(db_field, **kwargs)
+        return field

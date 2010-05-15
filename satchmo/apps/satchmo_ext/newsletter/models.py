@@ -1,10 +1,6 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
-from satchmo_store.contact.forms import ContactInfoForm
 from satchmo_store.contact.models import Contact
-from satchmo_store.contact.signals import form_save
-from satchmo_utils.signals import collect_urls
-from satchmo_store import shop
 import datetime
 import logging
 
@@ -73,13 +69,13 @@ class Subscription(models.Model):
 
         return value
 
-    def save(self, force_insert=False, force_update=False):
+    def save(self, **kwargs):
         if not self.pk:
             self.create_date = datetime.date.today()
 
         self.update_date = datetime.date.today()
 
-        super(Subscription, self).save(force_insert=force_insert, force_update=force_update)
+        super(Subscription, self).save(**kwargs)
                 
     def update_attribute(self, name, value):
         """Update or create a `SubscriptionAttribute` object with the passed `name` and `value`."""
@@ -111,7 +107,5 @@ class SubscriptionAttribute(models.Model):
         verbose_name_plural = _("Subscription Attributes")
 
 import config
-from listeners import contact_form_listener
-from urls import add_newsletter_urls
-form_save.connect(contact_form_listener, sender=ContactInfoForm)
-collect_urls.connect(add_newsletter_urls, sender=shop)
+import listeners
+listeners.start_listening()

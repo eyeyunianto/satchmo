@@ -1,106 +1,81 @@
+from decimal import Decimal
 from django import forms
-from product.models import Product, Price
+from livesettings import config_value
+from product.models import Product
+from satchmo_store.shop.signals import satchmo_cart_details_query, satchmo_cart_add_complete
+from satchmo_utils.numbers import RoundedDecimalError, round_decimal, PositiveRoundedDecimalField
+import logging
 
-class InventoryForm(forms.Form):
-    
+log = logging.getLogger('shop.forms')
+
+class MultipleProductForm(forms.Form):
+    """A form used to add multiple products to the cart."""
+
     def __init__(self, *args, **kwargs):
         products = kwargs.pop('products', None)
 
-        super(InventoryForm, self).__init__(*args, **kwargs)
+        super(MultipleProductForm, self).__init__(*args, **kwargs)
 
-        if not products:
-            products = Product.objects.by_site().order_by('slug')
+        if products:
+            products = [p for p in products if p.active]
+        else:
+            products = Product.objects.active_by_site()
+
+        self.slugs = [p.slug for p in products]
 
         for product in products:
-            subtypes = product.get_subtypes()
-            qtyclasses = ('text', 'qty') + subtypes
-            qtyclasses = " ".join(qtyclasses)
+            kw = {
+                'label' : product.name,
+                'help_text' : product.description,
+                'initial' : 0,
+                'widget' : forms.TextInput(attrs={'class': 'text'}),
+                'required' : False
+            }
 
-            kw = { 
-            'label' : product.slug,
-            'help_text' : product.name,
-            'initial' : product.items_in_stock,
-            'widget' : forms.TextInput(attrs={'class': qtyclasses}) }
-
-            qty = forms.IntegerField(**kw)
+            qty = PositiveRoundedDecimalField(**kw)
+            qty.product = product
             self.fields['qty__%s' % product.slug] = qty
-            qty.slug = product.slug
-            qty.product_id = product.id
-            qty.subtypes = " ".join(subtypes)
 
-            if 'CustomProduct' in subtypes:
-                initial_price = product.customproduct.full_price
-            else:
-                initial_price = product.unit_price
-                
-            kw['initial'] = initial_price
-            kw['required'] = False
-            kw['widget'] = forms.TextInput(attrs={'class': "text price"})
-            price = forms.DecimalField(**kw)
-            price.slug = product.slug
-            self.fields['price__%s' % product.slug] = price
-
-            kw['initial'] = product.active
-            kw['widget'] = forms.CheckboxInput(attrs={'class': "checkbox active"})
-            active = forms.BooleanField(**kw)
-            active.slug = product.slug
-            self.fields['active__%s' % product.slug] = active
-
-            kw['initial'] = product.featured
-            kw['widget'] = forms.CheckboxInput(attrs={'class': "checkbox featured"})
-            featured = forms.BooleanField(**kw)
-            featured.slug = product.slug
-            self.fields['featured__%s' % product.slug] = featured
-
-    def save(self, request):
+    def save(self, cart, request):
+        log.debug('saving');
         self.full_clean()
+        cartplaces = config_value('SHOP', 'CART_PRECISION')
+        roundfactor = config_value('SHOP', 'CART_ROUNDING')
+
         for name, value in self.cleaned_data.items():
             opt, key = name.split('__')
+            log.debug('%s=%s', opt, key)
 
-            prod = Product.objects.get(slug__exact=key)
-            subtypes = prod.get_subtypes()
-            
+            items = {}
+            quantity = 0
+            product = None
+
             if opt=='qty':
-                if value != prod.items_in_stock:
-                    request.user.message_set.create(message='Updated %s stock to %s' % (key, value))
-                    log.debug('Saving new qty=%i for %s' % (value, key))
-                    prod.items_in_stock = value
-                    prod.save()
+                try:
+                    quantity = round_decimal(value, places=cartplaces, roundfactor=roundfactor)
+                except RoundedDecimalError, P:
+                    quantity = 0
 
-            elif opt=='price':
-                if 'CustomProduct' in subtypes:
-                    full_price = prod.customproduct.full_price
-                else:
-                    full_price = prod.unit_price
-                    
-                if value != full_price:
-                    request.user.message_set.create(message='Updated %s unit price to %s' % (key, value))
-                    log.debug('Saving new price %s for %s' % (value, key))
-                    try:
-                        price = Price.objects.get(product=prod, quantity=1)
-                    except Price.DoesNotExist:
-                        price = Price(product=prod, quantity=1)
-                    price.price = value
-                    price.save()
+            if not key in self.slugs:
+                log.debug('caught attempt to add product not in the form: %s', key)
+            else:
+                try:
+                    product = Product.objects.get(slug=key)
+                except Product.DoesNotExist:
+                    log.debug('caught attempt to add an non-existent product, ignoring: %s', key)
 
-            elif opt=="active":
-                if value != prod.active:
-                    if value:
-                        note = "Activated %s"
-                    else:
-                        note = "Deactivated %s"
-                    request.user.message_set.create(message=note % (key))
-
-                    prod.active = value
-                    prod.save()
-
-            elif opt=="featured":
-                if value != prod.featured:
-                    if value:
-                        note = "%s is now featured"
-                    else:
-                        note = "%s is no longer featured"
-                    request.user.message_set.create(message=note % (key))
-
-                    prod.featured = value
-                    prod.save()
+            if product and quantity > Decimal('0'):
+                log.debug('Adding %s=%s to cart from MultipleProductForm', key, value)
+                details = []
+                formdata = request.POST
+                satchmo_cart_details_query.send(
+                    cart,
+                    product=product,
+                    quantity=quantity,
+                    details=details,
+                    request=request,
+                    form=formdata
+                )
+                added_item = cart.add_item(product, number_added=quantity, details=details)
+                satchmo_cart_add_complete.send(cart, cart=cart, cartitem=added_item,
+                    product=product, request=request, form=formdata)

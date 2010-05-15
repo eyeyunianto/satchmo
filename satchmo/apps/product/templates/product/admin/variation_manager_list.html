@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}{% if not is_popup %}
 <div class="breadcrumbs">
-     <a href="/admin/">{% trans "Home" %}</a> &rsaquo;
+     <a href="{% url admin:index %}">{% trans "Home" %}</a> &rsaquo;
      <a href="{% url satchmo_admin_variation_list %}">{% trans 'Product Variation Manager' %}</a>
 </div>
 {% endif %}{% endblock %}
@@ -13,7 +13,7 @@
 <ul>
 {% for p in products %}
     <li>
-        <a href="{% url satchmo_admin_variation_manager p.slug %}">{{ p.translated_name }}</a>
+        <a href="{% url satchmo_admin_variation_manager p.id %}">{{ p.translated_name }}</a>
     </li>
 {% endfor %}
 </ul>

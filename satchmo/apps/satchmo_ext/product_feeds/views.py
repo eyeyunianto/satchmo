@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, render_to_response
 from payment.config import credit_choices
 from product.models import Product, Category
 from satchmo_store.shop.models import Config
+from django.utils.translation import ugettext_lazy as _
 
 @user_passes_test(lambda u: u.is_authenticated() and u.is_staff, login_url='/accounts/login/')
 def admin_product_feed(request, category=None, template="product_feeds/product_feed.csv", mimetype="text/csv"):
@@ -20,7 +21,7 @@ def product_feed(request, category=None, template="product_feeds/googlebase_atom
     shop_config = Config.objects.get_current()
     if category:
         try:
-            cat = Category.objects.get(slug=category)
+            cat = Category.objects.active().get(slug=category)
             products = cat.active_products()
         except Category.DoesNotExist:
             raise Http404, _("Bad Category: %s" % category)

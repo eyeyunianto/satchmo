@@ -71,14 +71,16 @@ MIDDLEWARE_CLASSES = (
     "django.middleware.doc.XViewMiddleware",
     "threaded_multihost.middleware.ThreadLocalMiddleware",
     "satchmo_store.shop.SSLMiddleware.SSLRedirect",
-    "satchmo_ext.recentlist.middleware.RecentProductMiddleware",
+#    "satchmo_ext.recentlist.middleware.RecentProductMiddleware",
 )
 
 #this is used to add additional config variables to each request
+# NOTE: If you enable the recent_products context_processor, you MUST have the
+# 'satchmo_ext.recentlist' app installed.
 TEMPLATE_CONTEXT_PROCESSORS = (
     'django.core.context_processors.auth',
     'django.core.context_processors.media',
-    'satchmo_ext.recentlist.context_processors.recent_products',
+#    'satchmo_ext.recentlist.context_processors.recent_products',
     'satchmo_store.shop.context_processors.settings',
     'django.core.context_processors.i18n'
 )
@@ -102,6 +104,7 @@ INSTALLED_APPS = (
     'django.contrib.sitemaps',
     'django.contrib.sites',
     #'registration',
+    'sorl.thumbnail',
     'satchmo',
     'keyedcache',
     'livesettings',
@@ -115,13 +118,20 @@ INSTALLED_APPS = (
     #'satchmo_ext.brand'
     'shipping',
     'payment',
+    'payment.modules.dummy',
     'payment.modules.giftcertificate',
     'satchmo_store.contact.supplier',
+    # *****
+    # * Optional feature - admin toolbar for satchmo
+    # * Uncomment below to enable
+    # *
+    # *****
+    #'satchmo_ext.satchmo_toolbar',
     'satchmo_utils',
     'satchmo_utils.thumbnail',
     'l10n',
     'tax',
-    'satchmo_ext.recentlist',
+#    'satchmo_ext.recentlist',
     'satchmo_ext.wishlist',
     'satchmo_ext.upsell',
     'satchmo_ext.productratings',
@@ -154,7 +164,7 @@ INSTALLED_APPS = (
     # * jobs.
     # ****
     #'django_extensions',
-    
+
 )
 
 AUTHENTICATION_BACKENDS = (
@@ -188,24 +198,26 @@ SATCHMO_SETTINGS = {
     'SHOP_URLS' : patterns('',
         # disable this if you don't want multi-language
         (r'^i18n/', include('l10n.urls')),
-    
+
         # paypal urls need special treatment
-        # (r'^checkout/pay/$', 'payment.modules.paypal.checkout_step2.pay_ship_info', 
+        # (r'^checkout/pay/$', 'payment.modules.paypal.checkout_step2.pay_ship_info',
         #     {'SSL': False}, 'satchmo_checkout-step2'),
-        # (r'^checkout/confirm/$', 'paypal.checkout_step3.confirm_info', 
-        #     {'SSL': False}, 'satchmo_checkout-step3'),                
-    )
-    
+        # (r'^checkout/confirm/$', 'paypal.checkout_step3.confirm_info',
+        #     {'SSL': False}, 'satchmo_checkout-step3'),
+    ),
+
     # This is the base url for the shop.  Only include a leading slash
     # examples: '/shop' or '/mystore'
     # If you want the shop at the root directory, set SHOP_BASE to ''
     'SHOP_BASE' : '/store',
-    
+
     # Set this to true if you want to use the multi-shop features
     # of satchmo.  It requires the "threaded_multihost" application
     # to be on your pythonpath.
-    'MULTISHOP' : False,    
+    'MULTISHOP' : False,
 }
+
+SKIP_SOUTH_TESTS=True
 
 # Load the local settings
 from local_settings import *

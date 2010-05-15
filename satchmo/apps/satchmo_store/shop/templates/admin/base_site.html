@@ -3,14 +3,14 @@
 
 {% block extrahead %}
 {% blackbird_logging %}
+{% include "shop/_jquery.html" %}
 {{ block.super }}
-    <script src="{{media_url}}js/jquery.js" type="text/javascript"></script>
 	<script type="text/javascript"><!--
 	var satchmo = satchmo || {};
 	satchmo.select_if_one = function(selector, label) {
 		var elt = $(selector);
 		if (elt && elt.length>0 && elt[0].options.length == 2) {
-			log.debug('selecting default ' + label);
+			try { log.debug('selecting default ' + label); } catch(err) {};
 			elt[0].options[1].selected = true;
 		}
 	}
@@ -28,13 +28,14 @@
 #content-related { float:right; width:29em; position:relative; margin-right: -30em;}
 #content-related .module h2 { cursor: default; }
 #content-related .module h2 .status { font-style: italic; }
+div.tabular .vCurrencyField { width: 70%; }
 </style>
 {% endblock %}
 
-{% block title %}{{ title|escape }} | {% trans 'Satchmo Site Administration' %}{% endblock %}
+{% block title %}{{ title|escape }} | {{ shop_name }} {% trans 'Site Administration' %}{% endblock %}
 
 {% block branding %}
-<h1 id="site-name">{% trans 'Satchmo Site Administration' %}</h1>
+<h1 id="site-name">{{ shop_name }} {% trans 'Site Administration' %}</h1>
 {% endblock %}
 
 {% block nav-global %}

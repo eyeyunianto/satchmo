@@ -1,10 +1,4 @@
-try:
-    from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
-except:
-    from django.utils._decimal import Decimal, ROUND_HALF_UP, InvalidOperation
-
 from django.conf import settings
-from django.db import models
 import datetime
 import logging
 import os
@@ -26,6 +20,8 @@ def add_month(date, n=1):
 
 def app_enabled(appname):
     """Check the app list to see if a named app is installed."""
+    from django.db import models
+
     all_apps = {}
     for app in models.get_apps():
         n = app.__name__.split('.')[-2]
@@ -52,7 +48,7 @@ def cross_list(sequences):
         result = [sublist+[item] for sublist in result for item in seq]
     return result
 
-def current_media_url(request):    
+def current_media_url(request):
     """Return the media_url, taking into account SSL."""
     media_url = settings.MEDIA_URL
     secure = request_is_secure(request)
@@ -142,24 +138,12 @@ def request_is_secure(request):
     if 'HTTP_X_FORWARDED_SSL' in request.META:
         return request.META['HTTP_X_FORWARDED_SSL'] == 'on'
 
+    # Handle an additional case of proxying SSL requests. This is useful for Media Temple's
+    # Django container
+    if 'HTTP_X_FORWARDED_HOST' in request.META and request.META['HTTP_X_FORWARDED_HOST'].endswith('443'):
+        return True
+
     return False
-            
-def trunc_decimal(val, places):
-    roundfmt = "0."
-    if places > 1:
-        zeros = "0" * (places-1)
-        roundfmt += zeros
-    if places > 0:
-        roundfmt += "1"
-    if val is None:
-        val = Decimal('0.00000000')
-    if type(val) != Decimal:
-        try:
-            val = Decimal(val)
-        except InvalidOperation:
-            log.warn("invalid operation trying to convert '%s' to decimal, returning raw", val)
-            return val
-    return val.quantize(Decimal(roundfmt), ROUND_HALF_UP)
 
 def url_join(*args):
     """Join any arbitrary strings into a forward-slash delimited string.

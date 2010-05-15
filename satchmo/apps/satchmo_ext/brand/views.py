@@ -19,7 +19,8 @@ def brand_list(request):
     }
     signals.index_prerender.send(Brand, request=request, context=ctx, object_list=brands)
     requestctx = RequestContext(request, ctx)
-    return render_to_response('brand/index.html', requestctx)
+    return render_to_response('brand/index.html',
+                              context_instance=requestctx)
 
 def brand_page(request, brandname):
     try:
@@ -40,8 +41,9 @@ def brand_page(request, brandname):
 
     ctx = RequestContext(request, ctx)
     signals.index_prerender.send(BrandProduct, request=request, context=ctx, brand=brand, object_list=products)
-    
-    return render_to_response('brand/view_brand.html', ctx)
+
+    return render_to_response('brand/view_brand.html',
+                              context_instance=ctx)
 
 
 def brand_category_page(request, brandname, catname):
@@ -52,7 +54,7 @@ def brand_category_page(request, brandname, catname):
         raise Http404(_('Brand "%s" does not exist') % brandname)
         
     except BrandCategory.DoesNotExist:
-        raise Http404(_('No category "%s" in brand "%s"') % (catname, brandname))
+        raise Http404(_('No category "%{category}s" in brand "%{brand}s"').format(category=catname, brand=brandname))
         
     products = list(cat.active_products())
     sale = find_best_auto_discount(products)
@@ -61,4 +63,4 @@ def brand_category_page(request, brandname, catname):
         'brand' : cat,
         'sale' : sale,
     })
-    return render_to_response('brand/view_brand.html', ctx)
+    return render_to_response('brand/view_brand.html', context_instance=ctx)

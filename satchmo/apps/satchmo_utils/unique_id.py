@@ -5,7 +5,7 @@ If that doesn't work, we add random numbers to the name
 """
 
 from django.contrib.auth.models import User
-from django.utils.encoding import smart_unicode, force_unicode
+from django.utils.encoding import smart_unicode
 from htmlentitydefs import name2codepoint
 from satchmo_utils import random_string
 import re
@@ -35,7 +35,7 @@ def _id_generator(first_name, last_name, email):
     if len(id) >= _ID_MIN_LENGTH:
         yield id[:_ID_MAX_LENGTH]
     while True:
-        yield _alnum('%s_%s' % (id, random_string(_ID_MIN_LENGTH, True)))[:_ID_MAX_LENGTH]
+        yield _alnum('%s_%s' % (id[:_ID_MIN_LENGTH], random_string(_ID_MIN_LENGTH, True)))[:_ID_MAX_LENGTH]
 
 def generate_id(first_name='', last_name='', email=''):
     valid_id = False
@@ -77,7 +77,8 @@ def slugify(s, entities=True, decimal=True, hexadecimal=True,
     s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore')
 
     #replace unwanted characters
-    s = re.sub(r'[^-a-z0-9]+', '-', s.lower())
+    #Added _ because this is a valid slug option
+    s = re.sub(r'[^-a-z0-9_]+', '-', s.lower())
 
     #remove redundant -
     s = re.sub('-{2,}', '-', s).strip('-')

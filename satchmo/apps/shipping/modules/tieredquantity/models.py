@@ -1,11 +1,7 @@
 """
 Tiered shipping models
 """
-try:
-    from decimal import Decimal
-except:
-    from django.utils._decimal import Decimal
-
+from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.utils.translation import get_language, ugettext_lazy as _
@@ -25,7 +21,7 @@ class Shipper(BaseShipper):
     def __init__(self, carrier):
         self.id = carrier.key
         self.carrier = carrier
-        super(BaseShipper, self).__init__(self)
+        super(BaseShipper, self).__init__()
 
     def __str__(self):
         """
@@ -44,7 +40,7 @@ class Shipper(BaseShipper):
         Complex calculations can be done here as long as the return value is a dollar figure
         """
         assert(self._calculated)
-        qty = 0
+        qty = Decimal('0')
         for cartitem in self.cart.cartitem_set.all():
             if cartitem.product.is_shippable:
                 qty += cartitem.quantity
@@ -69,9 +65,9 @@ class Shipper(BaseShipper):
         if order:
             quants = [item.quantity for item in order.orderitem_set.all() if item.product.is_shippable]
             if quants:
-                qty = reduce(operator.add, itemprices)
+                qty = reduce(operator.add, quants)
             else:
-                qty = 0
+                qty = Decimal('0')
                                                 
         elif self.cart:
             qty = self.cart.numItems
@@ -101,11 +97,11 @@ class Carrier(models.Model):
             pos = language_code.find('-')
             if pos>-1:
                 short_code = language_code[:pos]
-                log.debug("%s: Trying to find root language content for: [%s]", self, short_code)
+                log.debug("%s: Trying to find root language content for: [%s]", self.id, short_code)
                 c = self.translations.filter(languagecode__exact = short_code)
                 ct = c.count()
                 if ct>0:
-                    log.debug("%s: Found root language content for: [%s]", self, short_code)
+                    log.debug("%s: Found root language content for: [%s]", self.id, short_code)
 
         if not c or ct == 0:
             #log.debug("Trying to find default language content for: %s", self)
@@ -185,7 +181,7 @@ class Carrier(models.Model):
             return Decimal(prices.order_by('-quantity')[0].calculate_price(qty))
 
         else:
-            log.debug("No quantity tier found for %s: qty=%s", self, qty)
+            log.debug("No quantity tier found for %s: qty=%d", self.id, qty)
             raise TieredPriceException('No price available')
             
             
@@ -208,7 +204,7 @@ class CarrierTranslation(models.Model):
 
 class QuantityTier(models.Model):
     carrier = models.ForeignKey('Carrier', related_name='tiers')
-    quantity = models.IntegerField(_("Min Quantity"), 
+    quantity = models.DecimalField(_("Min Quantity"), max_digits=18,  decimal_places=6,
         help_text=_('Minimum qty in order for this to apply?'), )
     handling = models.DecimalField(_("Handling Price"), max_digits=10, 
         decimal_places=2, )

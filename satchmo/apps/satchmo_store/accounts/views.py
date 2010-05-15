@@ -1,24 +1,22 @@
-from django import http
 from django.conf import settings
-from django.contrib.auth import logout, login, REDIRECT_FIELD_NAME
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.models import User
+from django.contrib.auth import login, REDIRECT_FIELD_NAME
 from django.contrib.sites.models import Site, RequestSite
 from django.core import urlresolvers
 from django.http import HttpResponseRedirect, QueryDict
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.translation import ugettext_lazy as _
-from forms import RegistrationAddressForm, RegistrationForm
-from mail import send_welcome_email
-from satchmo_store.accounts import signals
+from django.views.decorators.cache import never_cache
+from forms import RegistrationAddressForm, RegistrationForm, EmailAuthenticationForm
+from l10n.models import Country
 from livesettings import config_get_group, config_value
+from satchmo_store.accounts.mail import send_welcome_email
+from satchmo_store.accounts import signals
 from satchmo_store.contact import CUSTOMER_ID
 from satchmo_store.contact.models import Contact
-from l10n.models import Country
-from satchmo_store.shop.models import Config
+from satchmo_store.shop.models import Config, Cart
+
 import logging
-import signals
 
 log = logging.getLogger('satchmo_store.accounts.views')
 
@@ -27,36 +25,81 @@ YESNO = (
     (0, _('No'))
 )
 
-# ---- Helpers 
+def emaillogin(request, template_name='registration/login.html',
+    auth_form=EmailAuthenticationForm, redirect_field_name=REDIRECT_FIELD_NAME):
+    "Displays the login form and handles the login action. Altered to use the EmailAuthenticationForm"
 
-def _login(request, redirect_to):
+    redirect_to = request.REQUEST.get(redirect_field_name, '')
+
+    # Avoid redirecting to logout if the user clicked on login after logout
+    if redirect_to == urlresolvers.reverse('auth_logout'):
+        redirect_to = None
+
+    success, todo = _login(request, redirect_to)
+    if success:
+        # return the response redirect
+        return todo
+    else:
+        # continue with the login form
+        form = todo
+
+    request.session.set_test_cookie()
+    if Site._meta.installed:
+        current_site = Site.objects.get_current()
+    else:
+        current_site = RequestSite(request)
+
+    return render_to_response(template_name, {
+        'form': form,
+        redirect_field_name: redirect_to,
+        'site_name': current_site.name,
+    }, context_instance=RequestContext(request))
+emaillogin = never_cache(emaillogin)
+
+def _login(request, redirect_to, auth_form=EmailAuthenticationForm):
     """"Altered version of the default login, intended to be called by `combined_login`.
 
     Returns tuple:
     - success
     - redirect (success) or form (on failure)
     """
-    form = AuthenticationForm(data=request.POST)
+
     if request.method == 'POST':
+        form = auth_form(data=request.POST)
         if form.is_valid():
             # Light security check -- make sure redirect_to isn't garbage.
             if not redirect_to or '//' in redirect_to or ' ' in redirect_to:
                 redirect_to = settings.LOGIN_REDIRECT_URL
-            from django.contrib.auth import login
             login(request, form.get_user())
-            if request.session.test_cookie_worked():
-                request.session.delete_test_cookie()
+            if config_value('SHOP','PERSISTENT_CART'):
+                _get_prev_cart(request)
             return (True, HttpResponseRedirect(redirect_to))
         else:
-            log.error(form.errors)
+            log.debug(form.errors)
+    else:
+        form = auth_form(request)
 
     return (False, form)
+
+def _get_prev_cart(request):
+    try:
+        contact = Contact.objects.from_request(request)
+        saved_cart = contact.cart_set.latest('date_time_created')
+        # If the latest cart has len == 0, cart is unusable.
+        if len(saved_cart) and 'cart' in request.session:
+            # Merge the two carts together
+            existing_cart = Cart.objects.from_request(request, create=False)
+            saved_cart.merge_carts(existing_cart)
+        request.session['cart'] = saved_cart.id
+    except Exception, e:
+        pass
+
 
 def register_handle_address_form(request, redirect=None):
     """
     Handle all registration logic.  This is broken out from "register" to allow easy overriding/hooks
     such as a combined login/register page.
-    
+
     This handler allows a login or a full registration including address.
 
     Returns:
@@ -99,12 +142,8 @@ def register_handle_address_form(request, redirect=None):
                 try:
                     initial_data['country'] = address.country
                 except Country.DoesNotExist:
-                    USA = Country.objects.get(iso2_code__exact="US")    
+                    USA = Country.objects.get(iso2_code__exact="US")
                     initial_data['country'] = USA
-
-        signals.satchmo_registration_initialdata.send(contact,
-            contact=contact,
-            initial_data=initial_data)
 
         form = RegistrationAddressForm(initial=initial_data, shop=shop, contact=contact)
 
@@ -115,8 +154,8 @@ def register_handle_form(request, redirect=None):
     """
     Handle all registration logic.  This is broken out from "register" to allow easy overriding/hooks
     such as a combined login/register page.
-    
-    This method only presents a typical login or register form, not a full address form 
+
+    This method only presents a typical login or register form, not a full address form
     (see register_handle_address_form for that one.)
 
     Returns:
@@ -129,9 +168,14 @@ def register_handle_form(request, redirect=None):
         if form.is_valid():
             contact = form.save(request)
 
-            if not redirect:
-                redirect = urlresolvers.reverse('registration_complete')
-            return (True, http.HttpResponseRedirect(redirect))
+            # look for explicit "next"
+            next = request.POST.get('next', '')
+            if not next:
+                if redirect:
+                    next = redirect
+                else:
+                    next = urlresolvers.reverse('registration_complete')
+            return (True, HttpResponseRedirect(next))
 
     else:
         initial_data = {}
@@ -140,14 +184,13 @@ def register_handle_form(request, redirect=None):
             initial_data = {
                 'email': contact.email,
                 'first_name': contact.first_name,
-                'last_name': contact.last_name }
+                'last_name': contact.last_name,
+            }
         except Contact.DoesNotExist:
             log.debug("No contact in request")
             contact = None
 
-        signals.satchmo_registration_initialdata.send(contact,
-            contact=contact,
-            initial_data=initial_data)
+        initial_data['next'] = request.GET.get('next', '')
 
         form = RegistrationForm(initial=initial_data)
 
@@ -171,7 +214,7 @@ def activate(request, activation_key):
         # when the login form is posted, user = authenticate(username=data['username'], password=data['password'])
         # ...but we cannot authenticate without password... so we work-around authentication
         account.backend = settings.AUTHENTICATION_BACKENDS[0]
-        login(request, account)
+        _login(request, account)
         contact = Contact.objects.get(user=account)
         request.session[CUSTOMER_ID] = contact.id
         send_welcome_email(contact.email, contact.first_name, contact.last_name)
@@ -181,8 +224,9 @@ def activate(request, activation_key):
         'account': account,
         'expiration_days': config_value('SHOP', 'ACCOUNT_ACTIVATION_DAYS'),
     })
-    return render_to_response('registration/activate.html', context) 
-    
+    return render_to_response('registration/activate.html',
+                              context_instance=context)
+
 
 def login_signup(request, template_name="contact/login_signup.html", registration_handler=register_handle_form):
     """Display/handle a combined login and create account form"""
@@ -212,7 +256,8 @@ def login_signup(request, template_name="contact/login_signup.html", registratio
                         REDIRECT_FIELD_NAME: redirect_to,
                     })
 
-                    return render_to_response('registration/registration_complete.html', ctx)
+                    return render_to_response('registration/registration_complete.html',
+                                              context_instance=ctx)
             else:
                 createform = todo
 
@@ -225,7 +270,7 @@ def login_signup(request, template_name="contact/login_signup.html", registratio
                 loginform = todo
 
         request.POST = QueryDict("")
-        request.method = ""
+
 
     else:
         request.session.set_test_cookie()
@@ -256,11 +301,11 @@ def login_signup(request, template_name="contact/login_signup.html", registratio
     }
 
     if extra_context:
-        ctx.update(extra_context)            
+        ctx.update(extra_context)
 
     context = RequestContext(request, ctx)
 
-    return render_to_response(template_name, context)
+    return render_to_response(template_name, context_instance=context)
 
 
 def login_signup_address(request, template_name="contact/login_signup_address.html"):
@@ -292,7 +337,7 @@ def register(request, redirect=None, template='registration/registration_form.ht
             show_newsletter = False
 
         ctx = {
-            'form': todo, 
+            'form': todo,
             'title' : _('Registration Form'),
             'show_newsletter' : show_newsletter
         }
@@ -301,12 +346,5 @@ def register(request, redirect=None, template='registration/registration_form.ht
             ctx.update(extra_context)
 
         context = RequestContext(request, ctx)
-        return render_to_response(template, context)
+        return render_to_response(template, context_instance=context)
 
-
-def shop_logout(request):
-    logout(request)
-    if CUSTOMER_ID in request.session:
-        del request.session[CUSTOMER_ID]
-    url = urlresolvers.reverse('satchmo_shop_home')
-    return http.HttpResponseRedirect(url)    

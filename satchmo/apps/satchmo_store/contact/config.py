@@ -1,4 +1,4 @@
-from livesettings import config_register, StringValue, IntegerValue, BooleanValue
+from livesettings import config_register, StringValue, IntegerValue, BooleanValue, MultipleStringValue
 from satchmo_store.shop.config import SHOP_GROUP
 
 from django.utils.translation import ugettext_lazy as _
@@ -13,18 +13,51 @@ config_register(
 )
 
 config_register(
-    BooleanValue(SHOP_GROUP,
-    'BILLING_DATA_OPTIONAL',
-    description=_("Billing data is optional"),
+    MultipleStringValue(SHOP_GROUP,
+    'REQUIRED_BILLING_DATA',
+    description=_("Required billing data"),
     help_text=_(
-        "Users will not be required to provide billing address and phone number. If authentication "
-        "before checkout is required, this allows instant purchase (all required contact data will "
-        "have already been provided in registration form). Otherwise be careful, as this may leave "
-        "you orders with almost no customer data!"
+        "Users may be required to provide some set of billing address. Other fields are optional. "
+        "You may shorten the checkout process here, but be careful, as this may leave you orders "
+        "with almost no customer data! Some payment modules may override this setting."
         ),
-    default=False,
+    default=('email', 'first_name', 'last_name', 'phone', 'street1', 'city', 'postal_code', 'country'),
+    choices=(
+        ('email', _("Email")),
+        ('title', _("Title")),
+        ('first_name', _("First name")),
+        ('last_name', _("Last name")),
+        ('phone', _("Phone")),
+        ('addressee', _("Addressee")),
+        ('organization', _("Organization")),
+        ('street1', _("Street")),
+        ('street2', _("Street (second line)")),
+        ('city', _("City")),
+        ('state', _("State/Province")),
+        ('postal_code', _("Postal code/ZIP")),
+        ('country', _("Country"))
+        )
     )
 )
+
+config_register(
+    MultipleStringValue(SHOP_GROUP,
+    'REQUIRED_SHIPPING_DATA',
+    description=_("Required shipping data"),
+    help_text=_("Similar to'REQUIRED_BILLING_DATA', except for shipping fields."),
+    default=('addressee', 'street1', 'city', 'postal_code', 'country'),
+    choices=(
+        ('addressee', _("Addressee")),
+        ('street1', _("Street")),
+        ('street2', _("Street (second line)")),
+        ('city', _("City")),
+        ('state', _("State/Province")),
+        ('postal_code', _("Postal code/ZIP")),
+        ('country', _("Country"))
+        )
+    )
+)
+
 # I am doing it this way instead of a boolean for email verification because I
 # intend to add a "manual approval" style of account verification. -Bruce
 ACCOUNT_VERIFICATION = config_register(StringValue(SHOP_GROUP,
@@ -35,7 +68,7 @@ ACCOUNT_VERIFICATION = config_register(StringValue(SHOP_GROUP,
     choices=[('IMMEDIATE', _('Immediate')),
              ('EMAIL', _('Email'))]
     ))
-             
+
 config_register(
     IntegerValue(SHOP_GROUP,
     'ACCOUNT_ACTIVATION_DAYS',

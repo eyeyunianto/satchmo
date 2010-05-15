@@ -6,6 +6,7 @@
 {%- endblock %}
 
 {%- block relbar1 %}
+
 <div style="background-image: url({{ pathto("_static/satchmo-sliver.jpg",1)}}); background-repeat: repeat-x; background-color: white; text-align: left;">
 <img src="{{ pathto("_static/satchmo-front.jpg", 1) }}">
 </div>
@@ -16,8 +17,9 @@
 {{ super () }}
 <p>Documentation Version:</p>
 <ul>
-    <li><a href="/docs/svn">Current svn version</a></li>
+    <li><a href="/docs/dev">Current development version</a></li>
     <li><a href="/docs/rel/latest">Latest Release version</a></li>
+    <li><a href="http://bitbucket.org/chris1610/satchmo/downloads/Satchmo.pdf">PDF Documentation</a></li>
 </ul>
 {% endblock %}
 

@@ -4,8 +4,7 @@ Satchmo Change Log
 
 Trunk
 -----
-
-* Module Reorganization - major branch merge.  Reorganized/refactored project directory structure.  Merged Discount into Product app.  Split locales into app-specific locales.  Moved templates into correct app directories.
+see notes in docs/release-notes-0.9.txt
 
 Version 0.8.1, December 14, 2008
 --------------------------------
@@ -13,7 +12,7 @@ Version 0.8.1, December 14, 2008
  * Fix handling of ampersands in PDF generation
  * Update Italian translation
  * Update DOB widget
- * Added neve cache decorator to several views
+ * Added never_cache decorator to several views
  * Code speedups for discount checking
  
 

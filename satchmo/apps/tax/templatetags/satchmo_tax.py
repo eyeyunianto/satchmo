@@ -1,8 +1,4 @@
-try:
-    from decimal import Decimal
-except:
-    from django.utils._decimal import Decimal
-
+from decimal import Decimal
 from django import template
 from l10n.utils import moneyfmt
 from satchmo_utils.templatetags import get_filter_args
@@ -195,10 +191,10 @@ def taxed_price(parser, token):
 
     return TaxedPriceNode(price, currency, taxclass)
 
-
-def with_tax(product):
-    """Returns the product unit price with tax"""
-    return taxed
+# Commenting out because I don't believe this is used anywhere now.
+#def with_tax(product):
+#    """Returns the product unit price with tax"""
+#    return taxed
     
 
 register.tag('cartitem_line_taxed_total', cartitem_line_taxed_total)
