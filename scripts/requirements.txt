@@ -1,0 +1,13 @@
+django==1.4.5
+pycrypto
+http://www.satchmoproject.com/snapshots/trml2pdf-1.2.tar.gz
+PyYAML
+reportlab
+south
+sorl-thumbnail
+django-registration
+django-livesettings
+django-threaded-multihost
+django-caching-app-plugins
+django-signals-ahoy
+django-keyedcache
