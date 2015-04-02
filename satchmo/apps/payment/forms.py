@@ -21,7 +21,7 @@ from satchmo_utils.views import CreditCard
 from shipping.config import shipping_methods, shipping_method_by_key
 from shipping.signals import shipping_choices_query
 from shipping.utils import update_shipping
-from signals_ahoy.signals import form_init, form_initialdata, form_presave, form_postsave, form_validate
+from satchmo_utils.signals import form_init, form_initialdata, form_presave, form_postsave, form_validate
 from tax.templatetags.satchmo_tax import _get_taxprocessor
 from threaded_multihost import threadlocals
 import calendar
@@ -154,7 +154,7 @@ class CustomChargeForm(forms.Form):
     orderitem = forms.IntegerField(required=True, widget=forms.HiddenInput())
     amount = forms.DecimalField(label=_('New price'), required=False)
     shipping = forms.DecimalField(label=_('Shipping adjustment'), required=False)
-    notes = forms.CharField(_("Notes"), required=False, initial="Your custom item is ready.")
+    notes = forms.CharField(label=_('Notes'), required=False, initial="Your custom item is ready.")
 
     def __init__(self, *args, **kwargs):
         initial = kwargs.get('initial', {})

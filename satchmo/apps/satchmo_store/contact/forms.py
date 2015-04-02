@@ -2,12 +2,13 @@ from django import forms
 from django.db.models import Q
 from django.forms.extras.widgets import SelectDateWidget
 from django.utils.translation import ugettext_lazy as _, ugettext
+from django.utils import timezone
 from l10n.models import Country
 from livesettings import config_value
 from satchmo_store.contact.models import Contact, AddressBook, PhoneNumber, Organization, ContactRole
 from satchmo_store.shop.models import Config
 from satchmo_store.shop.utils import clean_field
-from signals_ahoy.signals import form_init, form_initialdata, form_postsave
+from satchmo_utils.signals import form_init, form_initialdata, form_postsave
 import datetime
 import logging
 import signals
@@ -39,7 +40,6 @@ class ContactInfoForm(ProxyContactForm):
     last_name = forms.CharField(max_length=30, label=_('Last Name'), required=False)
     phone = forms.CharField(max_length=30, label=_('Phone'), required=False)
     addressee = forms.CharField(max_length=61, label=_('Addressee'), required=False)
-    organization = forms.CharField(max_length=50, label=_('Organization'), required=False)
     street1 = forms.CharField(max_length=30, label=_('Street'), required=False)
     street2 = forms.CharField(max_length=30, required=False)
     city = forms.CharField(max_length=30, label=_('City'), required=False)
@@ -72,6 +72,8 @@ class ContactInfoForm(ProxyContactForm):
         self._local_only = shop.in_country_only
         self.enforce_state = config_value('SHOP','ENFORCE_STATE')
 
+        organization_name = self._contact and getattr(self._contact.organization, 'name', '')
+        self.fields['organization'] = forms.CharField(max_length=50, label=_('Organization'), required=False, initial=organization_name)
         self._default_country = shop.sales_country
         billing_country = (self._contact and getattr(self._contact.billing_address, 'country', None)) or self._default_country
         shipping_country = (self._contact and getattr(self._contact.shipping_address, 'country', None)) or self._default_country
@@ -457,7 +459,7 @@ class DateTextInput(forms.TextInput):
 
 class ExtendedContactInfoForm(ContactInfoForm):
     """Contact form which includes birthday and newsletter."""
-    years_to_display = range(datetime.datetime.now().year-100,datetime.datetime.now().year+1)
+    years_to_display = range(timezone.now().year-100,timezone.now().year+1)
     dob = forms.DateField(widget=SelectDateWidget(years=years_to_display), required=False)
     newsletter = forms.BooleanField(label=_('Newsletter'), widget=forms.CheckboxInput(), required=False)
 
